@@ -27,14 +27,16 @@
 //	double Yaw = tf::getYaw(msg->pose.pose.orientation); // Robot Yaw
 
 //}
+
+#define M_PI 3.14159265
 double X, Y, Yaw;
 void pose_callback(
     const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg) {
-  // This function is called when a new position message is received
+    // This function is called when a new position message is received
 
   X = msg->pose.pose.position.x;                // Robot X psotition
   Y = msg->pose.pose.position.y;                // Robot Y psotition
-  Yaw = tf::getYaw(msg->pose.pose.orientation); // Robot Yaw
+  Yaw = tf::getYaw(msg->pose.pose.orientation) + M_PI; // Robot Yaw + offset
 }
 
 int main(int argc, char **argv) {
@@ -79,7 +81,7 @@ int main(int argc, char **argv) {
       vel.linear.x = 0.00;
       vel.angular.z = 0.2;
       rotate_z += fabs( Yaw - lastYaw );
-      if (rotate_z > 3.14159265 / 2.0) {
+      if (rotate_z > (M_PI / 2.0) ) {
         travel_dist = 0;
         rotate_z = 0;
         vel.angular.z = 0;
