@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
   ros::Rate loop_rate(20); // 20Hz update rate
 
   ros::spinOnce();
-  const int dist = 0.5;
+  const double dist = 0.75;
   double travel_dist = 0;
   double lastX = X;
   double lastY = Y;
@@ -73,13 +73,15 @@ int main(int argc, char **argv) {
     // Update distances
     travel_dist += sqrtf ( powf((X - lastX), 2) + powf((Y - lastY), 2));
 
-    // 
+    //
     if (travel_dist > dist) {
-      vel.linear.x = 0.05;
+      ROS_INFO("TURNING, rotate_z: %f", rotate_z);
+      vel.linear.x = 0.00;
       vel.angular.z = 0.2;
       rotate_z += fabs( Yaw - lastYaw );
       if (rotate_z > 3.14159265 / 2.0) {
         travel_dist = 0;
+        rotate_z = 0;
         vel.angular.z = 0;
       }
     }
