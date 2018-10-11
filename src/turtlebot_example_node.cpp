@@ -79,8 +79,8 @@ int main(int argc, char **argv) {
     if (travel_dist > dist) {
       ROS_INFO("TURNING, rotate_z: %f", rotate_z);
       vel.linear.x = 0.00;
-      vel.angular.z = 0.2;
       rotate_z += fabs( Yaw - lastYaw );
+      vel.angular.z = 0.1 + (0.4/M_PI)*fabs(rotate_z - M_PI/2.0); // Simple P control
       if (rotate_z > (M_PI / 2.0) ) {
         travel_dist = 0;
         rotate_z = 0;
