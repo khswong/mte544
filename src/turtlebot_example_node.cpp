@@ -28,7 +28,7 @@
 
 //}
 
-#define M_PI 3.14159265
+//#define M_PI 3.14159265
 double X, Y, Yaw;
 void pose_callback(
     const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg) {
@@ -64,23 +64,25 @@ int main(int argc, char **argv) {
   double lastY = Y;
   double rotate_z = 0;
   double lastYaw = Yaw;
+
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
     ROS_INFO("X: %f Y: %f yaw: %f \n", X, Y, Yaw);
     ROS_INFO("lastX: %f lastY: %f lastyaw: %f \n", lastX, lastY, lastYaw);
-    ROS_INFO("distX: %f \n", travel_dist);
+    ROS_INFO("distX: %f rotate_z: %f \n", travel_dist, rotate_z);
     // Main loop code goes here:
 
     // Update distances
     travel_dist += sqrtf ( powf((X - lastX), 2) + powf((Y - lastY), 2));
 
     //
+    #define THRESHOLD 0.05
     if (travel_dist > dist) {
       ROS_INFO("TURNING, rotate_z: %f", rotate_z);
       vel.linear.x = 0.00;
       rotate_z += fabs( Yaw - lastYaw );
-      vel.angular.z = 0.1 + (0.4/M_PI)*fabs(rotate_z - M_PI/2.0); // Simple P control
+      vel.angular.z = 0.1 + 0.5*(2.0/M_PI)*fabs(rotate_z - M_PI/2.0); // Simple P control
       if (rotate_z > (M_PI / 2.0) ) {
         travel_dist = 0;
         rotate_z = 0;
@@ -88,7 +90,7 @@ int main(int argc, char **argv) {
       }
     }
     else {
-      vel.linear.x = 0.2;
+      vel.linear.x = 0.1 + 0.5 * fabs(travel_dist - dist);
     }
 
     //Update after
