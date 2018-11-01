@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle n;
 
   // Subscribe to the desired topics and assign callbacks
-  ros::Subscriber pose_sub = n.subscribe("/amcl_pose", 1, pose_callback);
+  ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
 
   // Setup topics to Publish from this node
   ros::Publisher velocity_publisher =
