@@ -14,7 +14,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_datatypes.h>
-#include <gazebo_msgs/ModelStates.h>
+#include <gazebo_msgs/ModelStates.  h>
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
 
@@ -38,6 +38,7 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     ips_x = msg.pose[i].position.x;
     ips_y = msg.pose[i].position.y;
     ips_yaw = tf::getYaw(msg.pose[i].orientation);
+    ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", X, Y, Yaw);
 }
 
 //Callback function for the Position topic (LIVE)
@@ -126,14 +127,20 @@ int main(int argc, char **argv) {
     ros::Rate loop_rate(20); //20Hz update rate
 
     while (ros::ok()) {
-        //Main loop code goes here:
-        vel.linear.x = 0.1;  // set linear speed
-        vel.angular.z = 0.3; // set angular speed
+      //Main loop code goes here:
 
+      //Prediction update
+
+      //Measurement update
+
+      
+
+      vel.linear.x = 0.1;  // set linear speed
+      vel.angular.z = 0.3; // set angular speed
+        
         velocity_publisher.publish(vel); // Publish the command velocity
         loop_rate.sleep(); //Maintain the loop rate
         ros::spinOnce();   //Check for new messages
     }
-
     return 0;
 }
