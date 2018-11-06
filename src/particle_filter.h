@@ -6,21 +6,28 @@
 #include <eigen3/Eigen/Dense>
 
 class ParticleFilter {
-  std::vector<Vector3f> particles;
-  std::vector<Vector3f> weights;
-  Vector3f cumWeight; 
+
+  // RNG
+  std::random_device rd;
+  std::mt19937 rng;
+  std::uniform_real_distribution<> dis(0.0, 1.0);
+  // particles
+  std::vector<Vector3d> particles;
 
   // Motion model
-  Matrix3f motionA;
-  Matrix3f motionB;
+  Matrix3d motionA;
+  Matrix3d motionB;
 
   //Measurement model
-  Matrix3f measurementC;
+  Vector3d measurementY;
+  Matrix3d measurementC;
+
+  double sample(double stddev);
 
  public:
-  Matrix3f getMotionA();
-  Matrix3f getMotionB();
-  void particleUpdate(Vector3f input);
-  Vector3f randomError();
+  Matrix3d getMotionA();
+  Matrix3d getMotionB();
+  void particleUpdate(Vector3d input);
+  Vector3d randomError();
 
 }

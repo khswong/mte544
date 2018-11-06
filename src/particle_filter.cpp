@@ -3,6 +3,7 @@
 #include <cmath>
 #include <random>
 
+Vector3f y; 
 
 // Take the recipe for this formula from these sources:
 // https://www.mathworks.com/help/stats/normpdf.html
@@ -13,9 +14,9 @@ double normpdf(double x, double mu, double sigma)
   return (ONE_OVER_SQRT_2PI) * exp(-0.5*pow(x-mu, 2)/pow(sigma, 2) );
 }
 
-Vector3f normpdf3f (Vector3f x, Vector3f mu, Vector3f sigma)
+Vector3f normpdf3f (Vector3d x, Vector3d mu, Vector3d sigma)
 {
-  Vector3f normVec;
+  Vector3d normVec;
   for (int i = 0; i < 3; i++)
     {
       normVec(i) = normpdf(x(i), mu(i), sigma(i));
@@ -30,8 +31,13 @@ ParticleFilter::ParticleFilter()
 }
 
 //Constructor/initialization
-ParticleFilter::ParticleFilter(Matrix3f A, Matrix3f B, )
-{
+ParticleFilter::ParticleFilter(Matrix3d A, Matrix3d B, Matrix3d C,
+                               int numParticles)
+    : motionA{A}, motionB{B}, measurementC{C} {
+      for (int i = 0; i < numParticles; i++)
+        {
+          particles.push
+        }
 }
 
 ParticleFilter::~ParticleFilter()
@@ -39,26 +45,52 @@ ParticleFilter::~ParticleFilter()
   
 }
 
-void ParticleFilter::particleUpdate(Vector3f input) {
-  Vector3f error;
-  std::vector<Vector3f>::iterator ptr;
-  std::vector<Vector3f>::iterator weight_ptr = weights.begin();
-  for (ptr = particles.begin(); ptr < particles.end(); ptr++)
+void ParticleFilter::measurementUpdate(Vector3d measurement)
+{
+  measurementY = measurement;
+}
+
+void ParticleFilter::particleUpdate(Vector3d input) {
+
+  // Set up
+  std::vector<Vector3d> tempParticles = particles;
+  std::vector<Vector3d> weights;
+  std::vector<Vector3d> cumWeight;
+  weights.reserve(tempParticles.size());
+  cumWeights.reserve(tempParticles.size());
+
+  Vector3d error;
+
+  for (unsigned i : indices(tempParticles))
     {
       // Random disturbance
-      error = randomError();
+      error = R.unaryExpr(ptr_fun(sample));
       // Propogate each particle through motion model
-      *ptr = (motionA * (*ptr) + motionB * input) + error;
-      //
-      *weight_ptr = normpdf3f(y, measurementC * (*ptr), stddev);
-      weight_ptr++;
+      tempParticles[i] = (motionA * (*ptr) + motionB * input) + error;
+      // Calculate weighting
+      weights.push_back(normpdf3f(measurementY, measurementC * (*ptr), stddev));
+      // Calculate cumulative sum
+      cumWeights.push_back( i > 0 ? cumWeights[i - 1] + weight[i] : weight[i]);
     }
-  for (weight_ptr = weights.begin(); ptr < weights.end(); weight_ptr++)
-    {
-      cumWeight = cumWeight + (*weight_ptr);
+
+  // Resample
+    for (std::vector<Vector3d>::iterator ptr = particles.begin();
+         ptr < particles.end(); ptr++) {
+      seed = cumWeights.back() * dis(rng);
+      for (unsigned i : indices(weights))
+        {
+          if ( weights[i] > seed )
+            {
+              ptr = tempParticles[i];
+              break;
+            }
+        }
     }
 }
 
-Vector3f ParticleFilter::randomError() {
-  
+
+double sample(double stddev)
+{
+  normal_distribution<> nd(stddev,1.0);
+  return nd(rng);
 }
