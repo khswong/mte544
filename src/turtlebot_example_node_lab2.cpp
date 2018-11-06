@@ -18,6 +18,8 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+#include "particle_filter.h"
+
 ros::Publisher pose_publisher;
 ros::Publisher marker_pub;
 
@@ -137,10 +139,10 @@ int main(int argc, char **argv) {
 
       vel.linear.x = 0.1;  // set linear speed
       vel.angular.z = 0.3; // set angular speed
-        
-        velocity_publisher.publish(vel); // Publish the command velocity
-        loop_rate.sleep(); //Maintain the loop rate
-        ros::spinOnce();   //Check for new messages
+
+      velocity_publisher.publish(vel); // Publish the command velocity
+      loop_rate.sleep(); //Maintain the loop rate
+      ros::spinOnce();   //Check for new messages
     }
     return 0;
 }

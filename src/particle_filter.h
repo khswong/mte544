@@ -1,5 +1,6 @@
-
-
+#include <ros/ros.h>
+#include <vector>
+#include <Eigen/Dense>
 class ParticleFilter
 {
   struct Particle
