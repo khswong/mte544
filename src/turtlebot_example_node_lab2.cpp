@@ -14,9 +14,10 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_datatypes.h>
-#include <gazebo_msgs/ModelStates.  h>
+#include <gazebo_msgs/ModelStates.h>
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <eigen3/Eigen/Dense>
 
 #include "particle_filter.h"
 

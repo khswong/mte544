@@ -1,16 +1,26 @@
 #include <ros/ros.h>
+
 #include <vector>
-#include <Eigen/Dense>
-class ParticleFilter
-{
-  struct Particle
-  {
-    double x;
-    double y;
-    double yaw;
-  }
+#include <map>
+#include <random>
+#include <eigen3/Eigen/Dense>
 
-  std::vector<Particle> particles;
+class ParticleFilter {
+  std::vector<Vector3f> particles;
+  std::vector<Vector3f> weights;
+  Vector3f cumWeight; 
 
+  // Motion model
+  Matrix3f motionA;
+  Matrix3f motionB;
+
+  //Measurement model
+  Matrix3f measurementC;
+
+ public:
+  Matrix3f getMotionA();
+  Matrix3f getMotionB();
+  void particleUpdate(Vector3f input);
+  Vector3f randomError();
 
 }
