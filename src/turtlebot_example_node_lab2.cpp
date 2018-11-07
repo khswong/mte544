@@ -41,7 +41,7 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     ips_x = msg.pose[i].position.x;
     ips_y = msg.pose[i].position.y;
     ips_yaw = tf::getYaw(msg.pose[i].orientation);
-    ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", X, Y, Yaw);
+    ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
 }
 
 //Callback function for the Position topic (LIVE)
@@ -117,6 +117,8 @@ int main(int argc, char **argv) {
     //Subscribe to the desired topics and assign callbacks
     ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
     ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
+#define N_PARTICLES 500
+    ParticleFilter pf(N_PARTICLES);
 
     //Setup topics to Publish from this node
     ros::Publisher velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
@@ -133,10 +135,7 @@ int main(int argc, char **argv) {
       //Main loop code goes here:
 
       //Prediction update
-
-      //Measurement update
-
-      
+      pf.particleUpdate(Eigen::Vector3d::Zero());
 
       vel.linear.x = 0.1;  // set linear speed
       vel.angular.z = 0.3; // set angular speed

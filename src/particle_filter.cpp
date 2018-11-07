@@ -18,9 +18,9 @@ double normpdf(double x, double mu, double sigma)
   return (ONE_OVER_SQRT_2PI) * exp(-0.5*pow(x-mu, 2)/pow(sigma, 2) );
 }
 
-Vector3f normpdf3d (Vector3d x, Vector3d mu, Vector3d sigma)
+Eigen::Vector3d normpdf3d (Eigen::Vector3d x, Eigen::Vector3d mu, Eigen::Vector3d sigma)
 {
-  Vector3d normVec;
+  Eigen::Vector3d normVec;
   for (int i = 0; i < 3; i++)
     {
       normVec(i) = normpdf(x(i), mu(i), sigma(i));
@@ -29,91 +29,107 @@ Vector3f normpdf3d (Vector3d x, Vector3d mu, Vector3d sigma)
 }
 
 
-ParticleFilter::double sample(double stddev)
+double ParticleFilter::sample(double stddev)
 {
   // Further optimization - set up vector of nd from R in initialization
-  normal_distribution<> nd(stddev,1.0);
+  static std::mt19937 rng;
+  std::normal_distribution<> nd(stddev,1.0);
   return nd(rng);
 }
 
 //Blank constructor
-ParticleFilter::ParticleFilter() : ParticleFilter(Matrix3d::Identity(), Matrix3d::Identity(), Matrix3d::Identity(), 0)
+ParticleFilter::ParticleFilter() : ParticleFilter(0)
 {
 }
 
+ParticleFilter::ParticleFilter(int numParticles)
+    : ParticleFilter(Eigen::Matrix3d::Identity(), Eigen::Matrix3d::Identity(),
+                     Eigen::Matrix3d::Identity(), numParticles) {}
 //Constructor/initialization
-ParticleFilter::ParticleFilter(Matrix3d A, Matrix3d B, Matrix3d C,
+ParticleFilter::ParticleFilter(Eigen::Matrix3d A, Eigen::Matrix3d B, Eigen::Matrix3d C,
                                int numParticles)
     : motionA(A), motionB(B), measurementC(C) {
+  // Initialize random number generators
+  dis = std::uniform_real_distribution<double>(0.0, 1.0);
+
   for (int i = 0; i < numParticles; i++) {
     // can i do that
     // im pretty sure i cant do that
-    particles.insert(Vector3d::Zero());
+    Eigen::Vector3d particle = Eigen::Vector3d::Zero();
+    particles.push_back(particle);
   }
 }
 
-ParticleFilter::~ParticleFilter()
-{
-  
-}
-
-void ParticleFilter::measurementUpdate(Vector3d measurement)
+void ParticleFilter::measurementUpdate(Eigen::Vector3d measurement)
 {
   measurementY = measurement;
 }
 
-void ParticleFilter::particleUpdate(Vector3d input) {
+void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
 
   // Set up
-  std::vector<Vector3d> tempParticles = particles;
-  std::vector<Vector3d> weights;
-  std::vector<Vector3d> cumWeight;
+  std::vector<Eigen::Vector3d> tempParticles = particles;
+  std::vector<Eigen::Vector3d> weights;
+  std::vector<Eigen::Vector3d> cumWeights;
   weights.reserve(tempParticles.size());
   cumWeights.reserve(tempParticles.size());
 
-  Vector3d error;
+  std::vector<Eigen::Vector3d>::iterator particles_iter = particles.begin();
+  std::vector<Eigen::Vector3d>::iterator tempParticles_iter = tempParticles.begin();
+  std::vector<Eigen::Vector3d>::iterator weights_iter;
 
-  for (unsigned i : indices(tempParticles))
+  while(particles_iter != particles.end() || tempParticles_iter != tempParticles.end())
     {
       // Random disturbance
-      error = R.unaryExpr(ptr_fun(sample));
+      Eigen::Vector3d error;
+      error << sample(R(0)), sample(R(1)), sample(R(2));
       // Propogate each particle through motion model
-      tempParticles[i] = (motionA * (*ptr) + motionB * input) + error;
+      *tempParticles_iter = (motionA * (*particles_iter) + motionB * input) + error;
       // Calculate weighting
-      weights.push_back(normpdf3d(measurementY, measurementC * (*ptr), stddev));
+      weights.push_back(normpdf3d(measurementY, measurementC * (*tempParticles_iter), R));
       // Calculate cumulative sum
-      cumWeights.push_back( i > 0 ? cumWeights[i - 1] + weight[i] : weight[i]);
+      cumWeights.push_back( cumWeights.size() > 0 ? cumWeights.back() + weights.back() : weights.back());
+
+      //Iterate
+      if (particles_iter != particles.end())
+        {
+          particles_iter++;
+        }
+      if (tempParticles_iter != tempParticles.end())
+        {
+          tempParticles_iter++;
+        }
     }
 
   // Resample
-    for (std::vector<Vector3d>::iterator ptr = particles.begin();
-         ptr < particles.end(); ptr++) {
-      seed = cumWeights.back() * dis(rng);
-      for (unsigned i : indices(weights))
-        {
-          if ( weights[i] > seed )
-            {
-              ptr = tempParticles[i];
-              break;
-            }
+  for (particles_iter = particles.begin();
+         particles_iter < particles.end(); particles_iter++) {
+    Eigen::Vector3d seed = cumWeights.back() * dis(rng);
+    for (tempParticles_iter = tempParticles.begin();
+         weights_iter < weights.end() &&
+           tempParticles_iter < tempParticles.end() && (*weights_iter).norm() < seed.norm();
+         weights_iter++, tempParticles_iter++) {
+      if ((*weights_iter).norm() < seed.norm()) {
+        *particles_iter = *tempParticles_iter;
+        break;
+      }
         }
     }
 }
 
 void ParticleFilter::calculateStats()
 {
-  for (std::vector<Vector3d>::iterator ptr = particles.begin();
+  for (std::vector<Eigen::Vector3d>::iterator ptr = particles.begin();
        ptr < particles.end(); ptr)
     {
       particleMean = particleMean + (*ptr);
     }
-    particleMean = particleMean.unaryExpr(
-        [](double elem) { return elem / double(particles.size()); });
+    particleMean = particleMean/ double(particles.size());
 }
 
 
 // Accessors
 
-Matrix3d getMotionA() { return motionA; }
-Matrix3d getMotionB() { return motionB; }
-Vector3d getMean() {return particleMean; }
+Eigen::Matrix3d ParticleFilter::getMotionA() { return motionA; }
+Eigen::Matrix3d ParticleFilter::getMotionB() { return motionB; }
+Eigen::Vector3d ParticleFilter::getMean() {return particleMean; }
