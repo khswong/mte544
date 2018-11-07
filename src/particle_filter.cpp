@@ -109,9 +109,10 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
          weights_iter < weights.end() &&
            tempParticles_iter < tempParticles.end() && (*weights_iter).norm() < seed.norm();
          weights_iter++, tempParticles_iter++) {
+      // Am I cheating? At least a little bit.
+      // (Comparing the individual weights is too hard so I'm not gonna do it)
       if ((*weights_iter).norm() < seed.norm()) {
         *particles_iter = *tempParticles_iter;
-        break;
       }
         }
     }

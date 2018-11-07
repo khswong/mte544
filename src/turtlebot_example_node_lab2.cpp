@@ -24,6 +24,11 @@
 ros::Publisher pose_publisher;
 ros::Publisher marker_pub;
 
+// Singleton I guess?
+
+#define N_PARTICLES 500
+ParticleFilter pf(N_PARTICLES);
+
 double ips_x;
 double ips_y;
 double ips_yaw;
@@ -32,8 +37,8 @@ short sgn(int x) { return x >= 0 ? 1 : -1; }
 
 //Callback function for the Position topic (SIMULATION)
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
-
     int i;
+    Eigen::Vector3d measurement;
     for (i = 0; i < msg.name.size(); i++)
         if (msg.name[i] == "mobile_base")
             break;
@@ -41,6 +46,8 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     ips_x = msg.pose[i].position.x;
     ips_y = msg.pose[i].position.y;
     ips_yaw = tf::getYaw(msg.pose[i].orientation);
+    measurement << ips_x, ips_y, ips_yaw;
+    pf.measurementUpdate(measurement);
     ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
 }
 
@@ -117,8 +124,6 @@ int main(int argc, char **argv) {
     //Subscribe to the desired topics and assign callbacks
     ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
     ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
-#define N_PARTICLES 500
-    ParticleFilter pf(N_PARTICLES);
 
     //Setup topics to Publish from this node
     ros::Publisher velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
@@ -135,7 +140,9 @@ int main(int argc, char **argv) {
       //Main loop code goes here:
 
       //Prediction update
-      pf.particleUpdate(Eigen::Vector3d::Zero());
+      Eigen::Vector3d input;
+      input << vel.linear.x, vel.linear.y, vel.angular.z;
+      pf.particleUpdate(input);
 
       vel.linear.x = 0.1;  // set linear speed
       vel.angular.z = 0.3; // set angular speed

@@ -9,7 +9,6 @@ class ParticleFilter {
 
   // RNG
   std::random_device rd;
-  std::mt19937 rng;
   std::uniform_real_distribution<double> dis;
 
   // particles
@@ -18,7 +17,7 @@ class ParticleFilter {
   // Motion model
   Eigen::Matrix3d motionA;
   Eigen::Matrix3d motionB;
-  Eigen::Vector3d R;
+  Eigen::Vector3d measurementR;
 
   //Measurement model
   Eigen::Vector3d measurementY;
