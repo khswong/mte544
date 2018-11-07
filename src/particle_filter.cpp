@@ -3,7 +3,11 @@
 #include <cmath>
 #include <random>
 
-Vector3f y; 
+/*
+ * Standard mathematical functions to be used within this file
+ * normpdf, normpdf3d
+ */
+
 
 // Take the recipe for this formula from these sources:
 // https://www.mathworks.com/help/stats/normpdf.html
@@ -14,7 +18,7 @@ double normpdf(double x, double mu, double sigma)
   return (ONE_OVER_SQRT_2PI) * exp(-0.5*pow(x-mu, 2)/pow(sigma, 2) );
 }
 
-Vector3f normpdf3f (Vector3d x, Vector3d mu, Vector3d sigma)
+Vector3f normpdf3d (Vector3d x, Vector3d mu, Vector3d sigma)
 {
   Vector3d normVec;
   for (int i = 0; i < 3; i++)
@@ -24,20 +28,28 @@ Vector3f normpdf3f (Vector3d x, Vector3d mu, Vector3d sigma)
   return normVec;
 }
 
-//Blank constructor
-ParticleFilter::ParticleFilter()
+
+ParticleFilter::double sample(double stddev)
 {
-  
+  // Further optimization - set up vector of nd from R in initialization
+  normal_distribution<> nd(stddev,1.0);
+  return nd(rng);
+}
+
+//Blank constructor
+ParticleFilter::ParticleFilter() : ParticleFilter(Matrix3d::Identity(), Matrix3d::Identity(), Matrix3d::Identity(), 0)
+{
 }
 
 //Constructor/initialization
 ParticleFilter::ParticleFilter(Matrix3d A, Matrix3d B, Matrix3d C,
                                int numParticles)
-    : motionA{A}, motionB{B}, measurementC{C} {
-      for (int i = 0; i < numParticles; i++)
-        {
-          particles.push
-        }
+    : motionA(A), motionB(B), measurementC(C) {
+  for (int i = 0; i < numParticles; i++) {
+    // can i do that
+    // im pretty sure i cant do that
+    particles.insert(Vector3d::Zero());
+  }
 }
 
 ParticleFilter::~ParticleFilter()
@@ -68,7 +80,7 @@ void ParticleFilter::particleUpdate(Vector3d input) {
       // Propogate each particle through motion model
       tempParticles[i] = (motionA * (*ptr) + motionB * input) + error;
       // Calculate weighting
-      weights.push_back(normpdf3f(measurementY, measurementC * (*ptr), stddev));
+      weights.push_back(normpdf3d(measurementY, measurementC * (*ptr), stddev));
       // Calculate cumulative sum
       cumWeights.push_back( i > 0 ? cumWeights[i - 1] + weight[i] : weight[i]);
     }
@@ -88,9 +100,20 @@ void ParticleFilter::particleUpdate(Vector3d input) {
     }
 }
 
-
-double sample(double stddev)
+void ParticleFilter::calculateStats()
 {
-  normal_distribution<> nd(stddev,1.0);
-  return nd(rng);
+  for (std::vector<Vector3d>::iterator ptr = particles.begin();
+       ptr < particles.end(); ptr)
+    {
+      particleMean = particleMean + (*ptr);
+    }
+    particleMean = particleMean.unaryExpr(
+        [](double elem) { return elem / double(particles.size()); });
 }
+
+
+// Accessors
+
+Matrix3d getMotionA() { return motionA; }
+Matrix3d getMotionB() { return motionB; }
+Vector3d getMean() {return particleMean; }
