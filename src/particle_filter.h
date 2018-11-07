@@ -17,7 +17,7 @@ class ParticleFilter {
   // Motion model
   Eigen::Matrix3d motionA;
   Eigen::Matrix3d motionB;
-  Eigen::Vector3d measurementR;
+  Eigen::Vector3d R;
 
   //Measurement model
   Eigen::Vector3d measurementY;
