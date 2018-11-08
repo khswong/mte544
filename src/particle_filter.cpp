@@ -1,4 +1,8 @@
 #include "particle_filter.h"
+
+#include <ros/ros.h>
+#include <geometry_msgs/PoseStamped.h>
+
 #include <eigen3/Eigen/Dense>
 #include <cmath>
 #include <random>
@@ -32,7 +36,6 @@ Eigen::Vector3d normpdf3d (Eigen::Vector3d x, Eigen::Vector3d mu, Eigen::Vector3
 double ParticleFilter::sample(double stddev)
 {
   // Further optimization - set up vector of nd from R in initialization
-  static std::mt19937 rng;
   std::normal_distribution<> nd(stddev,1.0);
   return nd(rng);
 }
@@ -51,7 +54,7 @@ ParticleFilter::ParticleFilter(Eigen::Matrix3d A, Eigen::Matrix3d B, Eigen::Matr
     : motionA(A), motionB(B), measurementC(C) {
   // Initialize random number generators
   dis = std::uniform_real_distribution<double>(0.0, 1.0);
-
+  ROS_INFO("CONSTRUCOTR");
   for (int i = 0; i < numParticles; i++) {
     // can i do that
     // im pretty sure i cant do that
@@ -74,15 +77,21 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
   weights.reserve(tempParticles.size());
   cumWeights.reserve(tempParticles.size());
 
-  std::vector<Eigen::Vector3d>::iterator particles_iter = particles.begin();
-  std::vector<Eigen::Vector3d>::iterator tempParticles_iter = tempParticles.begin();
+  std::vector<Eigen::Vector3d>::iterator particles_iter;
+  std::vector<Eigen::Vector3d>::iterator tempParticles_iter;
   std::vector<Eigen::Vector3d>::iterator weights_iter;
+
+  particles_iter = particles.begin();
+  tempParticles_iter = tempParticles.begin();
+
+  ROS_INFO("ParticleFilter update");
 
   while(particles_iter != particles.end() || tempParticles_iter != tempParticles.end())
     {
       // Random disturbance
       Eigen::Vector3d error;
       error << sample(R(0)), sample(R(1)), sample(R(2));
+
       // Propogate each particle through motion model
       *tempParticles_iter = (motionA * (*particles_iter) + motionB * input) + error;
       // Calculate weighting
@@ -105,14 +114,15 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
   for (particles_iter = particles.begin();
          particles_iter < particles.end(); particles_iter++) {
     Eigen::Vector3d seed = cumWeights.back() * dis(rng);
-    for (tempParticles_iter = tempParticles.begin();
-         weights_iter < weights.end() &&
-           tempParticles_iter < tempParticles.end() && (*weights_iter).norm() < seed.norm();
+    for (tempParticles_iter = tempParticles.begin(), weights_iter = weights.begin(); weights_iter < weights.end() &&
+           tempParticles_iter < tempParticles.end();
          weights_iter++, tempParticles_iter++) {
       // Am I cheating? At least a little bit.
       // (Comparing the individual weights is too hard so I'm not gonna do it)
-      if ((*weights_iter).norm() < seed.norm()) {
+      if ( (*weights_iter).norm() > seed.norm()) {
         *particles_iter = *tempParticles_iter;
+        ROS_INFO("Resample: %f %f %f", (*particles_iter)(0), (*particles_iter)(1), (*particles_iter)(2));
+        break;
       }
         }
     }
@@ -120,14 +130,21 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
 
 void ParticleFilter::calculateStats()
 {
+  particleMean = Eigen::Vector3d::Zero();
   for (std::vector<Eigen::Vector3d>::iterator ptr = particles.begin();
        ptr < particles.end(); ptr)
     {
       particleMean = particleMean + (*ptr);
     }
     particleMean = particleMean/ double(particles.size());
+    ROS_INFO("Mean: %f %f %f", particleMean(0), particleMean(1), particleMean(2));
 }
 
+
+// Mutators
+void ParticleFilter::setMotionA(Eigen::Matrix3d A) {motionA = A;}
+void ParticleFilter::setMotionB(Eigen::Matrix3d B) {motionB = B;}
+void ParticleFilter::setR(Eigen::Vector3d r) {R = r;}
 
 // Accessors
 

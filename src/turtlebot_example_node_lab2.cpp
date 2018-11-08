@@ -26,8 +26,10 @@ ros::Publisher marker_pub;
 
 // Singleton I guess?
 
-#define N_PARTICLES 500
+#define N_PARTICLES 10
 ParticleFilter pf(N_PARTICLES);
+
+//Eigen::Vector3d input = Eigen::Vector3d::Zero();
 
 double ips_x;
 double ips_y;
@@ -48,7 +50,7 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     ips_yaw = tf::getYaw(msg.pose[i].orientation);
     measurement << ips_x, ips_y, ips_yaw;
     pf.measurementUpdate(measurement);
-    ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
+    ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
 }
 
 //Callback function for the Position topic (LIVE)
@@ -67,6 +69,12 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
     //This function is called when a new map is received
 
     //you probably want to save the map into a form which is easy to work with
+}
+
+void velocity_callback(const geometry_msgs::Twist &msg ){
+  Eigen::Vector3d input;
+  input << msg.linear.x, msg.linear.y, msg.angular.z;
+    pf.particleUpdate(input);
 }
 
 //Bresenham line algorithm (pass empty vectors)
@@ -121,9 +129,11 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "main_control");
     ros::NodeHandle n;
 
+    ROS_INFO("Subscribe");
     //Subscribe to the desired topics and assign callbacks
     ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
     ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
+    ros::Subscriber velocity_sub = n.subscribe("/cmd_vel_mux/input/teleop", 1, velocity_callback);
 
     //Setup topics to Publish from this node
     ros::Publisher velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
@@ -136,20 +146,22 @@ int main(int argc, char **argv) {
     //Set the loop rate
     ros::Rate loop_rate(20); //20Hz update rate
 
+    Eigen::Vector3d r;
+    r << 1, 1, 1;
+    pf.setR(r);
+
     while (ros::ok()) {
-      //Main loop code goes here:
-
-      //Prediction update
-      Eigen::Vector3d input;
-      input << vel.linear.x, vel.linear.y, vel.angular.z;
-      pf.particleUpdate(input);
-
-      vel.linear.x = 0.1;  // set linear speed
-      vel.angular.z = 0.3; // set angular speed
-
-      velocity_publisher.publish(vel); // Publish the command velocity
       loop_rate.sleep(); //Maintain the loop rate
       ros::spinOnce();   //Check for new messages
+      //Main loop code goes here:
+      ROS_INFO("Main loop");
+      //Prediction update
+      //pf.particleUpdate(input);
+      //pf.calculateStats();
+
+      //velocity_publisher.publish(vel); // Publish the command velocity
     }
     return 0;
 }
+
+
