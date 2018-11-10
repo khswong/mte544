@@ -43,7 +43,7 @@ const int map_width = 10; //meters total width
 const int map_height = 10;
 int center_x = pix_to_m*map_width/2;
 int center_y = pix_to_m*map_height/2;
-int row_length = map_width*pix_to_m;
+int row_length = map_width * pix_to_m;
 
 nav_msgs::MapMetaData info;
 //map centered around 0,0
