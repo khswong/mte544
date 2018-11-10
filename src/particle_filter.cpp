@@ -36,7 +36,7 @@ Eigen::Vector3d normpdf3d (Eigen::Vector3d x, Eigen::Vector3d mu, Eigen::Vector3
 double ParticleFilter::sample(double stddev)
 {
   // Further optimization - set up vector of nd from R in initialization
-  std::normal_distribution<> nd(stddev,1.0);
+  std::normal_distribution<> nd(0,stddev);
   return nd(rng);
 }
 
@@ -58,14 +58,23 @@ ParticleFilter::ParticleFilter(Eigen::Matrix3d A, Eigen::Matrix3d B, Eigen::Matr
   for (int i = 0; i < numParticles; i++) {
     // can i do that
     // im pretty sure i cant do that
-    Eigen::Vector3d particle = Eigen::Vector3d::Zero();
+
+    // Random disturbance
+    Eigen::Vector3d initialSpread;
+    initialSpread << 0.5, 0.5, 0.5;
+    Eigen::Vector3d disturbance;
+    disturbance << sample(initialSpread(0)), sample(initialSpread(1)),
+        sample(initialSpread(2));
+    Eigen::Vector3d particle = Eigen::Vector3d::Zero() + disturbance;
     particles.push_back(particle);
   }
 }
 
 void ParticleFilter::measurementUpdate(Eigen::Vector3d measurement)
 {
-  measurementY = measurement;
+  Eigen::Vector3d error;
+  error << sample(R(0)), sample(R(1)), sample(R(2));
+  measurementY = measurement + error;
 }
 
 void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
@@ -132,14 +141,14 @@ void ParticleFilter::calculateStats()
 {
   particleMean = Eigen::Vector3d::Zero();
   for (std::vector<Eigen::Vector3d>::iterator ptr = particles.begin();
-       ptr < particles.end(); ptr)
+       ptr < particles.end(); ptr++)
     {
       particleMean = particleMean + (*ptr);
     }
-    particleMean = particleMean/ double(particles.size());
-    ROS_INFO("Mean: %f %f %f", particleMean(0), particleMean(1), particleMean(2));
+    particleMean = particleMean * (1.0 / double(particles.size()));
+    ROS_INFO("Mean: %f %f %f", particleMean(0), particleMean(1),
+             particleMean(2));
 }
-
 
 // Mutators
 void ParticleFilter::setMotionA(Eigen::Matrix3d A) {motionA = A;}
@@ -151,3 +160,4 @@ void ParticleFilter::setR(Eigen::Vector3d r) {R = r;}
 Eigen::Matrix3d ParticleFilter::getMotionA() { return motionA; }
 Eigen::Matrix3d ParticleFilter::getMotionB() { return motionB; }
 Eigen::Vector3d ParticleFilter::getMean() {return particleMean; }
+std::vector<Eigen::Vector3d> ParticleFilter::getParticles() {return particles; }

@@ -22,7 +22,7 @@ class ParticleFilter {
   Eigen::Matrix3d motionB;
   Eigen::Vector3d R = Eigen::Vector3d::Zero();
 
-  //Measurement model
+  //Measurement mode
   Eigen::Vector3d measurementY;
   Eigen::Matrix3d measurementC;
 
@@ -46,8 +46,7 @@ class ParticleFilter {
   Eigen::Matrix3d getMotionA();
   Eigen::Matrix3d getMotionB();
   Eigen::Vector3d getMean();
-  // geometry_msgs::
-  
+  std::vector<Eigen::Vector3d> getParticles();
   // State updators
   void particleUpdate(Eigen::Vector3d input);
   void measurementUpdate(Eigen::Vector3d measurement);
