@@ -17,9 +17,17 @@
 #include <gazebo_msgs/ModelStates.h>
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <eigen3/Eigen/Dense>
+
+#include "particle_filter.h"
 
 ros::Publisher pose_publisher;
 ros::Publisher marker_pub;
+
+// Singleton I guess?
+
+#define N_PARTICLES 500
+ParticleFilter pf(N_PARTICLES);
 
 double ips_x;
 double ips_y;
@@ -29,8 +37,8 @@ short sgn(int x) { return x >= 0 ? 1 : -1; }
 
 //Callback function for the Position topic (SIMULATION)
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
-
     int i;
+    Eigen::Vector3d measurement;
     for (i = 0; i < msg.name.size(); i++)
         if (msg.name[i] == "mobile_base")
             break;
@@ -38,6 +46,9 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     ips_x = msg.pose[i].position.x;
     ips_y = msg.pose[i].position.y;
     ips_yaw = tf::getYaw(msg.pose[i].orientation);
+    measurement << ips_x, ips_y, ips_yaw;
+    pf.measurementUpdate(measurement);
+    ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
 }
 
 //Callback function for the Position topic (LIVE)
@@ -126,14 +137,19 @@ int main(int argc, char **argv) {
     ros::Rate loop_rate(20); //20Hz update rate
 
     while (ros::ok()) {
-        //Main loop code goes here:
-        vel.linear.x = 0.1;  // set linear speed
-        vel.angular.z = 0.3; // set angular speed
+      //Main loop code goes here:
 
-        velocity_publisher.publish(vel); // Publish the command velocity
-        loop_rate.sleep(); //Maintain the loop rate
-        ros::spinOnce();   //Check for new messages
+      //Prediction update
+      Eigen::Vector3d input;
+      input << vel.linear.x, vel.linear.y, vel.angular.z;
+      pf.particleUpdate(input);
+
+      vel.linear.x = 0.1;  // set linear speed
+      vel.angular.z = 0.3; // set angular speed
+
+      velocity_publisher.publish(vel); // Publish the command velocity
+      loop_rate.sleep(); //Maintain the loop rate
+      ros::spinOnce();   //Check for new messages
     }
-
     return 0;
 }
