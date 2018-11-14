@@ -27,6 +27,7 @@ class ParticleFilter {
   Eigen::Matrix3d measurementC;
 
   Eigen::Vector3d particleMean;
+  Eigen::Vector3d particleMedian;
   Eigen::Vector3d particleVariance;
 
   double sample(double stddev);
@@ -46,9 +47,11 @@ class ParticleFilter {
   Eigen::Matrix3d getMotionA();
   Eigen::Matrix3d getMotionB();
   Eigen::Vector3d getMean();
+  Eigen::Vector3d getMedian();
   std::vector<Eigen::Vector3d> getParticles();
   // State updators
   void particleUpdate(Eigen::Vector3d input);
+  void particleInit(Eigen::Vector3d pose);
   void measurementUpdate(Eigen::Vector3d measurement);
   void calculateStats();
 };
