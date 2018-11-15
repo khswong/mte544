@@ -3,6 +3,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <ros/ros.h>
 
+#include <algorithm>
 #include <cmath>
 #include <eigen3/Eigen/Dense>
 #include <random>
@@ -94,7 +95,7 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
   particles_iter = particles.begin();
   tempParticles_iter = tempParticles.begin();
 
-  ROS_DEBUG("ParticleFilter update");
+  //  ROS_DEBUG("ParticleFilter update");
 
   while (particles_iter != particles.end() ||
          tempParticles_iter != tempParticles.end()) {
@@ -105,6 +106,10 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
     // Propogate each particle through motion model
     *tempParticles_iter =
         (motionA * (*particles_iter) + motionB * input) + error;
+    // Saturator
+    (*tempParticles_iter)(2) =
+        fmod((*tempParticles_iter)(2) + M_PI, 2 * M_PI) - M_PI;
+
     // Calculate weighting
     weights.push_back(
         normpdf3d(measurementY, measurementC * (*tempParticles_iter), R));
@@ -121,29 +126,42 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
     }
   }
 
-  Eigen::Vector3d seed = cumWeights.back() * dis(rng);
+  Eigen::Vector3d seed;
+  Eigen::Vector3i set;
   // Resample
   for (particles_iter = particles.begin(); particles_iter < particles.end();
        particles_iter++) {
     seed = cumWeights.back() * dis(rng);
+   set = Eigen::Vector3i::Zero();
     for (tempParticles_iter = tempParticles.begin(),
         weights_iter = weights.begin();
          weights_iter < weights.end() ||
          tempParticles_iter < tempParticles.end();
          weights_iter++, tempParticles_iter++) {
-      for (int i = 0; i < 3; i++) {
-        if ((*weights_iter)(i) > seed(i)) {
-          (*particles_iter)(i) = (*tempParticles_iter)(i);
-          break;
-        }
+      if ((*weights_iter)(0) > seed(0) && !set(0)) {
+        (*particles_iter)(0) = (*tempParticles_iter)(0);
+        set(0) = 1;
+      }
+      if ((*weights_iter)(1) > seed(1) && !set(1)) {
+        (*particles_iter)(1) = (*tempParticles_iter)(1);
+        set(1) = 1;
+      }
+      if ((*weights_iter)(2) > seed(2) && !set(2)) {
+        (*particles_iter)(2) = (*tempParticles_iter)(2);
+        set(2) = 1;
+      }
+      if (set(0) && set(1) && set(2)) {
+        break;
       }
     }
 
-    ROS_INFO("Weight: %f %f %f norm: %f", (*weights_iter)(0),
-             (*weights_iter)(1), (*weights_iter)(2), (*weights_iter).norm());
-    ROS_INFO("Seed: %f %f %f norm: %f", seed(0), seed(1), seed(2), seed.norm());
-    ROS_INFO("Resample: %f %f %f", (*particles_iter)(0), (*particles_iter)(1),
-             (*particles_iter)(2));
+    // ROS_INFO("Weight: %f %f %f norm: %f", (*weights_iter)(0),
+    //         (*weights_iter)(1), (*weights_iter)(2), (*weights_iter).norm());
+    // ROS_INFO("Seed: %f %f %f norm: %f", seed(0), seed(1), seed(2),
+    // seed.norm());
+    // ROS_INFO("Resample: %f %f %f", (*particles_iter)(0),
+    // (*particles_iter)(1),
+    //         (*particles_iter)(2));
   }
 }
 
@@ -155,17 +173,23 @@ void ParticleFilter::calculateStats() {
   for (std::vector<Eigen::Vector3d>::iterator ptr = particles.begin();
        ptr < particles.end(); ptr++) {
     particleMean = particleMean + (*ptr);
-    particleMean(2) = fmod(particleMean(2) + M_PI, M_PI) - M_PI;
+    particleMean(2) = fmod(particleMean(2) + M_PI, 2 * M_PI) - M_PI;
     x.push_back((*ptr)(0));
     y.push_back((*ptr)(1));
-    theta.push_back((*ptr)(2));
+    theta.push_back((*ptr)(2) + M_PI);
   }
+  std::sort(x.begin(), x.end(), [](double a, double b) { return a > b; });
+  std::sort(y.begin(), y.end(), [](double a, double b) { return a > b; });
+  std::sort(theta.begin(), theta.end(), [](double a, double b) { return a > b; });
+
   particleMedian(0) = *(x.begin() + (x.size() / 2));
   particleMedian(1) = *(y.begin() + (y.size() / 2));
-  particleMedian(2) = *(theta.begin() + (theta.size() / 2));
+  particleMedian(2) = *(theta.begin() + (theta.size() / 2)) - M_PI;
   particleMean = particleMean * (1.0 / double(particles.size()));
   ROS_INFO("Mean pose     X: %f Y: %f Yaw: %f", particleMean(0),
            particleMean(1), particleMean(2));
+  ROS_INFO("Median pose     X: %f Y: %f Yaw: %f", particleMedian(0),
+           particleMedian(1), particleMedian(2));
 }
 
 // Mutators

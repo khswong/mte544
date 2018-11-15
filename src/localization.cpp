@@ -12,13 +12,13 @@
 
 #include <ros/ros.h>
 
+#include <eigen3/Eigen/Dense>
+#include <gazebo_msgs/ModelStates.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
-#include <tf/transform_datatypes.h>
-#include <gazebo_msgs/ModelStates.h>
-#include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include <eigen3/Eigen/Dense>
+#include <tf/transform_datatypes.h>
+#include <visualization_msgs/Marker.h>
 
 #include "particle_filter.h"
 
@@ -28,7 +28,7 @@ ros::Publisher truepose_publisher;
 
 // Singleton I guess?
 
-#define N_PARTICLES 100
+#define N_PARTICLES 150
 ParticleFilter pf(N_PARTICLES);
 
 geometry_msgs::PoseStamped pfpose;
@@ -42,57 +42,56 @@ Eigen::Vector3d measurement = Eigen::Vector3d::Zero();
 
 short sgn(int x) { return x >= 0 ? 1 : -1; }
 
-//Callback function for the Position topic (SIMULATION)
+// Callback function for the Position topic (SIMULATION)
 #ifndef LIVE
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
-    int i;
-    for (i = 0; i < msg.name.size(); i++)
-        if (msg.name[i] == "mobile_base")
-            break;
+  int i;
+  for (i = 0; i < msg.name.size(); i++)
+    if (msg.name[i] == "mobile_base")
+      break;
 
-    ips_x = msg.pose[i].position.x;
-    ips_y = msg.pose[i].position.y;
-    ips_yaw = tf::getYaw(msg.pose[i].orientation);
-    measurement << ips_x, ips_y, ips_yaw;
-    pf.measurementUpdate(measurement);
-    // Also publish the true state
-    ipspose.header.frame_id = "map";
-    ipspose.pose = msg.pose[i];
-    // ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
+  ips_x = msg.pose[i].position.x;
+  ips_y = msg.pose[i].position.y;
+  ips_yaw = tf::getYaw(msg.pose[i].orientation);
+  measurement << ips_x, ips_y, ips_yaw;
+  pf.measurementUpdate(measurement);
+  // Also publish the true state
+  ipspose.header.frame_id = "map";
+  ipspose.pose = msg.pose[i];
+  // ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
 }
 #else
-//Callback function for the Position topic (LIVE)
-void pose_callback(const geometry_msgs::PoseWithCovarianceStamped& msg)
-{
-	ips_x X = msg.pose.pose.position.x; // Robot X psotition
-	ips_y Y = msg.pose.pose.position.y; // Robot Y psotition
-	ips_yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
-	ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", X, Y, Yaw);
+// Callback function for the Position topic (LIVE)
+void pose_callback(const geometry_msgs::PoseWithCovarianceStamped &msg) {
+  ips_x X = msg.pose.pose.position.x;              // Robot X psotition
+  ips_y Y = msg.pose.pose.position.y;              // Robot Y psotition
+  ips_yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
+  ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", X, Y, Yaw);
 }
 #endif
 
-//Callback function for the map
+// Callback function for the map
 void map_callback(const nav_msgs::OccupancyGrid &msg) {
-    //This function is called when a new map is received
+  // This function is called when a new map is received
 
-    //you probably want to save the map into a form which is easy to work with
+  // you probably want to save the map into a form which is easy to work with
 }
 
-void velocity_callback(const geometry_msgs::Twist &msg ){
+void velocity_callback(const geometry_msgs::Twist &msg) {
   Eigen::Vector3d input;
   Eigen::Matrix3d rot;
   double yaw = tf::getYaw(pfpose.pose.orientation);
+
   input << msg.linear.x, msg.linear.y, msg.angular.z;
-  if (!input.isZero())
-    {
-      rot << cos(yaw), 0 - sin(yaw), 0, sin(yaw), cos(yaw), 0, 0, 0, 1;
-      pf.particleUpdate(rot*input);
-      pf.calculateStats();
-    }
+
+  if (!input.isZero()) {
+    rot << cos(yaw), 0 - sin(yaw), 0, sin(yaw), cos(yaw), 0, 0, 0, 1;
+    pf.particleUpdate(rot * input);
+    pf.calculateStats();
+  }
 }
 
-static void marker_setup()
-{
+static void marker_setup() {
   marker.header.frame_id = "map";
   marker.header.stamp = ros::Time();
   marker.ns = "my_namespace";
@@ -110,66 +109,69 @@ static void marker_setup()
 }
 
 int main(int argc, char **argv) {
-    //Initialize the ROS framework
-    ros::init(argc, argv, "main_control");
-    ros::NodeHandle n;
+  // Initialize the ROS framework
+  ros::init(argc, argv, "main_control");
+  ros::NodeHandle n;
 
-    ROS_INFO("Subscribe");
-    //Subscribe to the desired topics and assign callbacks
+  ROS_INFO("Subscribe");
+// Subscribe to the desired topics and assign callbacks
 #ifndef LIVE
-    ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
-    ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
+  ros::Subscriber pose_sub =
+      n.subscribe("/gazebo/model_states", 1, pose_callback);
+  ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
 #else
-    ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
-    ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
+  ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+  ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
 #endif
-    ros::Subscriber velocity_sub = n.subscribe("/cmd_vel_mux/input/teleop", 1, velocity_callback);
+  ros::Subscriber velocity_sub =
+      n.subscribe("/cmd_vel_mux/input/teleop", 1, velocity_callback);
 
-    //Setup topics to Publish from this node
-    ros::Publisher velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
-    pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/pose", 1, true);
-    truepose_publisher = n.advertise<geometry_msgs::PoseStamped>("/ips_pose", 1, true);
-    marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1, true);
-    marker_setup();
+  // Setup topics to Publish from this node
+  ros::Publisher velocity_publisher =
+      n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
+  pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/pose", 1, true);
+  truepose_publisher =
+      n.advertise<geometry_msgs::PoseStamped>("/ips_pose", 1, true);
+  marker_pub =
+      n.advertise<visualization_msgs::Marker>("visualization_marker", 1, true);
+  marker_setup();
 
-    //Velocity control variable
-    geometry_msgs::Twist vel;
-    //Set the loop rate
-    ros::Rate loop_rate(20); //20Hz update rate
-    Eigen::Vector3d r;
-    r << 0.1, 0.1, 0.1;
-    pf.setR(r);
+  // Velocity control variable
+  geometry_msgs::Twist vel;
+  // Set the loop rate
+  ros::Rate loop_rate(20); // 20Hz update rate
+  Eigen::Vector3d r;
+  r << 0.1, 0.1, 0.1;
+  pf.setR(r);
 
-    while (ros::ok()) {
-      loop_rate.sleep(); //Maintain the loop rate
-      ros::spinOnce();   //Check for new messages
-      //Main loop code goes here:
+  while (ros::ok()) {
+    loop_rate.sleep(); // Maintain the loop rate
+    ros::spinOnce();   // Check for new messages
+    // Main loop code goes here:
 
-      // Return the mean position and publish to pose
-      Eigen::Vector3d mean = pf.getMean();
-      Eigen::Vector3d median = pf.getMedian();
-      pfpose.header.frame_id = "map";
-      pfpose.pose.position.x = mean(0);
-      pfpose.pose.position.y = mean(1);
-      pfpose.pose.orientation = tf::createQuaternionMsgFromYaw(median(2));
-      pose_publisher.publish(pfpose);
-      truepose_publisher.publish(ipspose);
-      // Visualize the particle filter
-      std::vector<Eigen::Vector3d> particles = pf.getParticles();
-      std::vector<Eigen::Vector3d>::iterator particle_iter;
-      marker.points.clear();
-      for (particle_iter = particles.begin(); particle_iter < particles.end();
-           particle_iter++) {
-        geometry_msgs::Point point;
-        point.x = (*particle_iter)(0);
-        point.y = (*particle_iter)(1);
-        point.z = 0;
-        marker.points.push_back(point);
-        }
-      marker_pub.publish(marker);
-      //velocity_publisher.publish(vel); // Publish the command velocity
+    // Return the mean position and publish to pose
+    Eigen::Vector3d mean = pf.getMean();
+    Eigen::Vector3d median = pf.getMedian();
+    pfpose.header.frame_id = "map";
+    pfpose.pose.position.x = mean(0);
+    pfpose.pose.position.y = mean(1);
+    pfpose.pose.orientation = tf::createQuaternionMsgFromYaw(median(2));
+    pose_publisher.publish(pfpose);
+    truepose_publisher.publish(ipspose);
+    // Visualize the particle filter
+    std::vector<Eigen::Vector3d> particles = pf.getParticles();
+    std::vector<Eigen::Vector3d>::iterator particle_iter;
+    marker.points.clear();
+    for (particle_iter = particles.begin(); particle_iter < particles.end();
+         particle_iter++) {
+      geometry_msgs::Point point;
+      point.x = (*particle_iter)(0);
+      point.y = (*particle_iter)(1);
+      point.z = 0;
+      marker.points.push_back(point);
     }
-    return 0;
+    marker_pub.publish(marker);
+    // velocity_publisher.publish(vel); // Publish the command velocity
+  }
+  return 0;
 }
-
-
