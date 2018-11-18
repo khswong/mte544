@@ -13,6 +13,7 @@ main loop:
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <tf/transform_datatypes.h>
 #include <gazebo_msgs/ModelStates.h>
 #include <visualization_msgs/Marker.h>
@@ -39,8 +40,8 @@ short sgn(int x) { return x >= 0 ? 1 : -1; }
 
 // WHAT OTHER STUFF HERE?
 const int pix_to_m = 50; // X pixels on the map grid = 1m
-const int map_width = 10; //meters total width
-const int map_height = 10;
+const int map_width = 20; //meters total width
+const int map_height = 20;
 const int laser_throttle = 1; //every X msgs, use 1
 float sensitivity = pix_to_m/200;
 
@@ -182,10 +183,10 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 			bool max_range = false;
 			if (dist != dist)
 			{
-				dist = 4; //check for nan - set as full dist
+				//dist = 4; //check for nan - set as full dist
 				max_range = true;
 			}
-			if (dist >= range_min && dist <= range_max)
+			if (dist >= range_min && dist <= 3)//range_max)
 			{
 				//dist = m_to_grid(range_max);
 				dist = m_to_grid(dist);
@@ -266,7 +267,9 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 
 
 		num_of_scans++;
-		ROS_INFO("got scan #%i\n", num_of_scans);
+		ROS_INFO("got scan #%i", num_of_scans);
+		ROS_INFO("pos: %f, %f", ips_x, ips_y);
+		ROS_INFO("dir: %f", ips_yaw);
 		//ROS_INFO("num of points in range: %i\n", rng_counter);
 		//for(int i=0; i<500; i++)
 			//ROS_INFO("map: pt:%i, val:%i", i, map[i]);
@@ -277,6 +280,7 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 }
 
 //Callback function for the Position topic (SIMULATION)
+/*
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
 
   int i;
@@ -289,19 +293,19 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
   ips_yaw = tf::getYaw(msg.pose[i].orientation);
 
 }
-
+*/
 //Callback function for the Position topic (LIVE)
-/*
+
 void pose_callback(const geometry_msgs::PoseWithCovarianceStamped& msg)
 {
-
-	ips_x X = msg.pose.pose.position.x; // Robot X psotition
-	ips_y Y = msg.pose.pose.position.y; // Robot Y psotition
+	ips_x = msg.pose.pose.position.x; // Robot X psotition
+	ips_y = msg.pose.pose.position.y; // Robot Y psotition
 	ips_yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
-	ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", X, Y, Yaw);
-}*/
+	ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
+}
 
 //Callback function for the map
+
 void map_callback(const nav_msgs::OccupancyGrid &msg) {
     //This function is called when a new map is received
 
@@ -367,7 +371,7 @@ int main(int argc, char **argv) {
     vel.angular.z = -0.05; // set angular speed
 	//velocity_publisher.publish(vel); // Publish the command velocity
 
-    ///////////////// waste man garbo
+    ///////////////// garbage test
     std_msgs::String msg;
     std::stringstream ss;
     ss << "hi";
