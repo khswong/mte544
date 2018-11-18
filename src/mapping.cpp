@@ -38,9 +38,12 @@ double ips_yaw; //facing direction
 short sgn(int x) { return x >= 0 ? 1 : -1; }
 
 // WHAT OTHER STUFF HERE?
-const int pix_to_m = 10; // X pixels on the map grid = 1m
+const int pix_to_m = 50; // X pixels on the map grid = 1m
 const int map_width = 10; //meters total width
 const int map_height = 10;
+const int laser_throttle = 1; //every X msgs, use 1
+float sensitivity = pix_to_m/200;
+
 int center_x = pix_to_m*map_width/2;
 int center_y = pix_to_m*map_height/2;
 int row_length = map_width*pix_to_m;
@@ -70,6 +73,32 @@ void rotate_point(float ang_rad, float dist, int &x1, int &y1)
 
 	x1 = int(round(c*dist)); //round to nearest int
 	y1 = int(round(s*dist));
+}
+
+void mark_point(int8_t* grid_point, bool clear)
+{
+
+	if (*grid_point == -1) //if a point is marked, at least it should be 100
+	{
+		*grid_point = 100;
+	}
+
+	if (*grid_point > 0)
+	{
+		if (clear) //subtract by an amount, min 1
+		{
+			int num1 = int(*grid_point * sensitivity +0.5);
+			int num2 = 1;
+			*grid_point -= (num1<num2)?num2:num1;
+		}
+		if (!clear)
+		{
+			*grid_point = 100;
+		}
+		
+		if (*grid_point < 0) *grid_point = 0;
+	}
+
 }
 
 //Bresenham line algorithm (pass empty vectors)
@@ -122,7 +151,6 @@ void bresenham(int x0, int y0, int x1, int y1, std::vector<int> &x, std::vector<
 
 
 //Callback function for laser scan
-int laser_throttle = 20; //every X msgs, use 1. (ie 1Hz or smth)
 int laser_counter = laser_throttle; //start at max to get a scan right now.
 int num_of_scans = 0;
 void laser_callback(const sensor_msgs::LaserScan &msg) 
@@ -144,16 +172,25 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 		float angle = ips_yaw + angle_min; //starting angle - facing direction of robot + left reach of scan area
 		int points_added_to_map = 0;
 		int rng_counter = 0;
+
 		for (std::vector<float>::iterator it = laser_scan.ranges.begin();
 				 it != laser_scan.ranges.end(); ++it)
 		{
 			float dist = *it;
-			//if (dist != dist) dist = 3; //check for nan - set as full dist
+			//ROS_INFO("dist: %f", dist);
+
+			bool max_range = false;
+			if (dist != dist)
+			{
+				dist = 4; //check for nan - set as full dist
+				max_range = true;
+			}
 			if (dist >= range_min && dist <= range_max)
 			{
 				//dist = m_to_grid(range_max);
 				dist = m_to_grid(dist);
-				////////////////
+				//ROS_INFO("dist: %i\n", int(dist));
+				
 				//find "endpoint" of the current scan.
 				//current position, rotate by (yaw+scan_angle = angle)
 				int start_x = m_to_grid(ips_x);
@@ -176,28 +213,42 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 					i!=x_clear.end() && j!=y_clear.end(); ++i, ++j) 
 				{
 					//center around [pix_to_m*(map_width/2), pix_to_m*(map_height/2)]
-					int grid_x = center_x+*i;
-					int grid_y = center_y+*j;
-					if ( grid_x >= map_width*pix_to_m || grid_x <= 0 || grid_x >= map_height*pix_to_m || grid_y <= 0)
+					grid_x = center_x+*i;
+					grid_y = center_y+*j;
+
+					//ROS_INFO("point x,y: (%i, %i)", grid_x, grid_y);
+
+					//check out of bounds
+					if ( grid_x >= map_width*pix_to_m || grid_x < 0 || grid_x >= map_height*pix_to_m || grid_y < 0)
 					{
-						ROS_INFO("center: x: #%i\n", center_x);
-						ROS_INFO("x: #%i\n", center_x+*i);
-						ROS_INFO("y: #%i\n", center_y+*j);
+						//ROS_INFO("center: x: #%i\n", center_x);
+						//ROS_INFO("x: #%i\n", center_x+*i);
+						//ROS_INFO("y: #%i\n", center_y+*j);
+						continue;
+					}
+
+					//check if last point
+					
+					if (std::next(i) == x_clear.end() && !max_range)
+					{
+						//last point
+						//ROS_INFO("last point x,y: (%i, %i)", grid_x, grid_y);
+						mark_point(&map[(grid_y)*row_length + (grid_x)], false);
+						//map[(grid_y)*row_length + (grid_x)] = 100;
 					}
 					else 
 					{
 						points_added_to_map++;
-						map[(grid_y)*row_length + (grid_x)] = 0;
+						mark_point(&map[(grid_y)*row_length + (grid_x)], true);
+						//map[(grid_y)*row_length + (grid_x)] = 0;
 					}
 
 				}
-
-				nav_msgs::OccupancyGrid newGrid;
-				newGrid.info = info;
-				std::vector<int8_t> a(map, map+(map_width*pix_to_m*map_height*pix_to_m));
-				newGrid.data = a;
-
-				map_pub.publish(newGrid);
+				//if not nan sensor reading,last point (ie the wall), mark as occupied
+				//last point
+				int last_x = center_x+end_x;
+				int last_y = center_y+end_y;
+				//mark_point(&map[(last_y)*row_length + (last_x)], -100);
 
 				rng_counter++;
 				//////////////////
@@ -206,12 +257,20 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 			angle += angle_increment;
 		}	
 
+		nav_msgs::OccupancyGrid newGrid;
+		newGrid.info = info;
+		std::vector<int8_t> a(map, map+(map_width*pix_to_m*map_height*pix_to_m));
+		newGrid.data = a;
+
+		map_pub.publish(newGrid);
+
+
 		num_of_scans++;
 		ROS_INFO("got scan #%i\n", num_of_scans);
-		ROS_INFO("num of points in range: %i\n", rng_counter);
+		//ROS_INFO("num of points in range: %i\n", rng_counter);
 		//for(int i=0; i<500; i++)
 			//ROS_INFO("map: pt:%i, val:%i", i, map[i]);
-		ROS_INFO("pts added to map: %i\n\n", points_added_to_map);
+		//ROS_INFO("pts added to map: %i\n\n", points_added_to_map);
 		laser_counter = 0;
 	}
 	else { laser_counter++; }
@@ -304,9 +363,9 @@ int main(int argc, char **argv) {
 
 
     //move around in a circle
-    vel.linear.x = 0.2;  // set linear speed
-    vel.angular.z = -0.2; // set angular speed
-		velocity_publisher.publish(vel); // Publish the command velocity
+    vel.linear.x = 0.05;  // set linear speed
+    vel.angular.z = -0.05; // set angular speed
+	//velocity_publisher.publish(vel); // Publish the command velocity
 
     ///////////////// waste man garbo
     std_msgs::String msg;
