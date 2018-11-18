@@ -18,6 +18,7 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+
 ros::Publisher pose_publisher;
 ros::Publisher marker_pub;
 
