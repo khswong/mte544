@@ -19,6 +19,9 @@ find_package(catkin REQUIRED COMPONENTS
     tf
 )
 
+find_package(Eigen3 REQUIRED)
+
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -124,6 +127,7 @@ catkin_package(
 include_directories(
 # include
 ${catkin_INCLUDE_DIRS}
+${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -139,8 +143,9 @@ ${catkin_INCLUDE_DIRS}
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/turtlebot_example_node_lab2.cpp)
-add_executable(mapping src/mapping.cpp)
+
+add_executable(${PROJECT_NAME}_localization_node src/turtlebot_example_node_lab2.cpp src/particle_filter.cpp)
+add_executable(${PROJECT_NAME}_mapping_node src/mapping.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
