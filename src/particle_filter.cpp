@@ -30,7 +30,7 @@ Eigen::Vector3d normpdf3d(Eigen::Vector3d x, Eigen::Vector3d mu,
   return normVec;
 }
 
-// I'm passing in 3d vectors but im only doing a bivariate multinorm pdf
+// I'm passing in 3d vectors but im only doing a bivariate gaussian pdf
 double multinormpdf(Eigen::Vector3d x, Eigen::Vector3d mu,
                     Eigen::Vector3d sigma) {
   return exp(-0.5 * (pow((x(0) - mu(0)), 2) / pow(sigma(0), 2) +
@@ -97,12 +97,8 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
   std::vector<double> weights_d;
   std::vector<double> cumWeights_d;
 
-  weights.reserve(tempParticles.size());
-  cumWeights.reserve(tempParticles.size());
-
   std::vector<Eigen::Vector3d>::iterator particles_iter;
   std::vector<Eigen::Vector3d>::iterator tempParticles_iter;
-  std::vector<Eigen::Vector3d>::iterator weights_iter;
   std::vector<double>::iterator weightsd_iter;
 
   particles_iter = particles.begin();
@@ -119,13 +115,10 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
     // Propogate each particle through motion model
     *tempParticles_iter =
         (motionA * (*particles_iter) + motionB * input) + error;
-    
-    // Calculate weighting
-    weights.push_back(
-        normpdf3d(measurementY, measurementC * (*tempParticles_iter), R));
-    // Calculate cumulative sum
-    cumWeights.push_back(cumWeights.size() ? cumWeights.back() + weights.back()
-                                           : weights.back());
+
+    // Saturator
+    (*tempParticles_iter)(2) =
+      fmod((*tempParticles_iter)(2) + M_PI, 2 * M_PI) - M_PI;
 
     // Calculate weighting
     weights_d.push_back(
@@ -134,11 +127,6 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
     cumWeights_d.push_back(cumWeights_d.size()
                                ? cumWeights_d.back() + weights_d.back()
                                : weights_d.back());
-
-    // Saturator
-    // Saturtor should go AFTER the probability stuff.
-    (*tempParticles_iter)(2) =
-      fmod((*tempParticles_iter)(2), 2 * M_PI);
 
     // Iterate
     if (particles_iter != particles.end()) {
@@ -149,36 +137,10 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
     }
   }
 
-  Eigen::Vector3d seed;
-  Eigen::Vector3i set;
   // Resample
   for (particles_iter = particles.begin(); particles_iter < particles.end();
        particles_iter++) {
-    seed = cumWeights.back() * dis(rng);
-    set = Eigen::Vector3i::Zero();
-#if 0
-    for (tempParticles_iter = tempParticles.begin(),
-        weights_iter = weights.begin();
-         weights_iter < weights.end() ||
-         tempParticles_iter < tempParticles.end();
-          weights_iter++, tempParticles_iter++) {
-     if ((*weights_iter)(0) > seed(0) && !set(0)) {
-        (*particles_iter)(0) = (*tempParticles_iter)(0);
-        set(0) = 1;
-      }
-      if ((*weights_iter)(1) > seed(1) && !set(1)) {
-        (*particles_iter)(1) = (*tempParticles_iter)(1);
-        set(1) = 1;
-      }
-      if ((*weights_iter)(2) > seed(2) && !set(2)) {
-        (*particles_iter)(2) = (*tempParticles_iter)(2);
-        set(2) = 1;
-      }
-      if (set(0) && set(1) && set(2)) {
-        break;
-      }
-    }
-#else
+
     double seed_d = cumWeights_d.back() * dis(rng);
     for (tempParticles_iter = tempParticles.begin(),
         weightsd_iter = weights_d.begin();
@@ -190,7 +152,6 @@ void ParticleFilter::particleUpdate(Eigen::Vector3d input) {
         break;
       }
     }
-#endif
 
     // ROS_INFO("Weight: %f %f %f norm: %f", (*weights_iter)(0),
     //         (*weights_iter)(1), (*weights_iter)(2), (*weights_iter).norm());
@@ -207,12 +168,17 @@ void ParticleFilter::calculateStats() {
   std::vector<double> x;
   std::vector<double> y;
   std::vector<double> theta;
+  double theta_x = 0;
+  double theta_y = 0;
   for (std::vector<Eigen::Vector3d>::iterator ptr = particles.begin();
        ptr < particles.end(); ptr++) {
     particleMean = particleMean + (*ptr);
     x.push_back((*ptr)(0));
     y.push_back((*ptr)(1));
     theta.push_back((*ptr)(2));
+
+    theta_x += cos(theta.back() + M_PI);
+    theta_y += sin(theta.back() + M_PI);
   }
   std::sort(x.begin(), x.end(), [](double a, double b) { return a > b; });
   std::sort(y.begin(), y.end(), [](double a, double b) { return a > b; });
@@ -224,8 +190,8 @@ void ParticleFilter::calculateStats() {
   particleMedian(2) = *(theta.begin() + (theta.size() / 2));
   particleMean = particleMean * (1.0 / double(particles.size()));
 
-  particleMedian(2) = fmod(particleMedian(2) + M_PI, 2 * M_PI) - M_PI;
-  particleMean(2) = fmod(particleMean(2) + M_PI, 2 * M_PI) - M_PI;
+  particleMedian(2) = fmod(particleMedian(2) + M_PI, 2 * M_PI); //  - M_PI;
+  particleMean(2) = atan(theta_y/theta_x) - M_PI;
   ROS_INFO("Mean pose     X: %f Y: %f Yaw: %f", particleMean(0),
            particleMean(1), particleMean(2));
   ROS_INFO("Median pose     X: %f Y: %f Yaw: %f", particleMedian(0),

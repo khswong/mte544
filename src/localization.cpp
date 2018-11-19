@@ -30,7 +30,7 @@ ros::Publisher truepose_publisher;
 
 // Singleton I guess?
 
-#define N_PARTICLES 150
+#define N_PARTICLES 100
 ParticleFilter pf(N_PARTICLES);
 
 geometry_msgs::PoseStamped pfpose;
@@ -44,7 +44,7 @@ Eigen::Vector3d measurement = Eigen::Vector3d::Zero();
 
 short sgn(int x) { return x >= 0 ? 1 : -1; }
 
-#define LIVE 1
+#define LIVE 
 // Callback function for the Position topic (SIMULATION)
 #ifndef LIVE
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
@@ -66,8 +66,8 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
 #else
 // Callback function for the Position topic (LIVE)
 void pose_callback(const geometry_msgs::PoseWithCovarianceStamped &msg) {
-  ips_x = msg.pose.pose.position.x;              // Robot X psotition
-  ips_y = msg.pose.pose.position.y;              // Robot Y psotition
+  ips_x = msg.pose.pose.position.x;                // Robot X psotition
+  ips_y = msg.pose.pose.position.y;                // Robot Y psotition
   ips_yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
 
   measurement << ips_x, ips_y, ips_yaw;
@@ -79,6 +79,12 @@ void pose_callback(const geometry_msgs::PoseWithCovarianceStamped &msg) {
 }
 #endif
 
+// Callback function for the map
+void map_callback(const nav_msgs::OccupancyGrid &msg) {
+  // This function is called when a new map is received
+  // you probably want to save the map into a form which is easy to work with
+}
+
 void velocity_callback(const geometry_msgs::Twist &msg) {
   static ros::Time time_now = ros::Time::now();
   static ros::Time time_prev;
@@ -88,6 +94,7 @@ void velocity_callback(const geometry_msgs::Twist &msg) {
   time_prev = time_now;
   time_now = ros::Time::now();
   ros::Duration dt = time_now - time_prev;
+  ROS_INFO("dt = %f", dt.toSec());
   input << msg.linear.x, msg.linear.y, msg.angular.z;
 
   if (!input.isZero()) {
@@ -124,9 +131,12 @@ int main(int argc, char **argv) {
 #ifndef LIVE
   ros::Subscriber pose_sub =
       n.subscribe("/gazebo/model_states", 1, pose_callback);
+  ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
 #else
   ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+  ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
 #endif
+
   ros::Subscriber velocity_sub =
       n.subscribe("/cmd_vel_mux/input/teleop", 1, velocity_callback);
 
@@ -159,7 +169,7 @@ int main(int argc, char **argv) {
     pfpose.header.frame_id = "map";
     pfpose.pose.position.x = mean(0);
     pfpose.pose.position.y = mean(1);
-    pfpose.pose.orientation = tf::createQuaternionMsgFromYaw(mean(2));
+    pfpose.pose.orientation = tf::createQuaternionMsgFromYaw(median(2));
     pose_publisher.publish(pfpose);
     truepose_publisher.publish(ipspose);
     // Visualize the particle filter
