@@ -1,12 +1,5 @@
 /*
-Mapping Pseudocode
-Nov 1 2018
-
-todo:
-implement laser scan callback: takes the scan and puts it in something to use
-main loop:
-	take current laser scan and update current map using bresenhem
-
+Mapping
 */
 
 // All imports and whatnot
@@ -23,6 +16,7 @@ main loop:
 #include "std_msgs/String.h"
 #include <sensor_msgs/LaserScan.h>
 #include <math.h>
+#include <cmath>
 
 ros::Publisher pose_publisher;
 ros::Publisher velocity_publisher;
@@ -32,6 +26,7 @@ ros::Subscriber pose_sub;
 ros::Subscriber map_sub;
 ros::Subscriber laser_sub;
 
+bool started = false;
 double ips_x; //pos
 double ips_y;
 double ips_yaw; //facing direction
@@ -42,8 +37,9 @@ short sgn(int x) { return x >= 0 ? 1 : -1; }
 const int pix_to_m = 50; // X pixels on the map grid = 1m
 const int map_width = 20; //meters total width
 const int map_height = 20;
-const int laser_throttle = 1; //every X msgs, use 1
-float sensitivity = pix_to_m/200;
+const int laser_throttle = 2; //every X msgs, use 1
+double sensitivity = pix_to_m/400;
+double yaw_tolerance = 0.1; //anything more than 0.5 rotations / frame = bad data. disgard.
 
 int center_x = pix_to_m*map_width/2;
 int center_y = pix_to_m*map_height/2;
@@ -55,8 +51,8 @@ int8_t map[map_width*pix_to_m*map_height*pix_to_m] = {-1}; //initialize all to b
 
 ////////////// CURRENT LASER SCAN VARIABLE:??
 sensor_msgs::LaserScan laser_scan;
-float angle_min, angle_max, angle_increment;
-float range_min, range_max; 
+double angle_min, angle_max, angle_increment;
+double range_min, range_max; 
 
 //........Useful Math Tools Stuff
 
@@ -67,10 +63,10 @@ int m_to_grid(double ips)
 }
 
 // rotate a vector [dist] length about point [0,0] of angle [ang_rad]
-void rotate_point(float ang_rad, float dist, int &x1, int &y1) 
+void rotate_point(double ang_rad, double dist, int &x1, int &y1) 
 {
-	float s = sin(ang_rad);
-	float c = cos(ang_rad);
+	double s = sin(ang_rad);
+	double c = cos(ang_rad);
 
 	x1 = int(round(c*dist)); //round to nearest int
 	y1 = int(round(s*dist));
@@ -81,10 +77,10 @@ void mark_point(int8_t* grid_point, bool clear)
 
 	if (*grid_point == -1) //if a point is marked, at least it should be 100
 	{
-		*grid_point = 100;
+		*grid_point = 90;
 	}
 
-	if (*grid_point > 0)
+	if (*grid_point >= 0)
 	{
 		if (clear) //subtract by an amount, min 1
 		{
@@ -94,10 +90,11 @@ void mark_point(int8_t* grid_point, bool clear)
 		}
 		if (!clear)
 		{
-			*grid_point = 100;
+			*grid_point =100;
 		}
 		
 		if (*grid_point < 0) *grid_point = 0;
+		if (*grid_point > 100) *grid_point = 100;
 	}
 
 }
@@ -156,41 +153,40 @@ int laser_counter = laser_throttle; //start at max to get a scan right now.
 int num_of_scans = 0;
 void laser_callback(const sensor_msgs::LaserScan &msg) 
 {
+
+	if (!started) return;
+	
 	if (laser_counter == laser_throttle) 
 	{
-		//TODO: do stuff here
 		laser_scan = msg;
 
 		angle_min = laser_scan.angle_min;
 		angle_max = laser_scan.angle_max;
 		angle_increment = laser_scan.angle_increment;
 		
-		//make sure all scans are good, don't take the nan's
-		range_min = laser_scan.range_min;
-		range_max = laser_scan.range_max;
+		//limits on the ranges we want to take
+		range_min = 0.5;
+		range_max = 3;
 		
-		
-		float angle = ips_yaw + angle_min; //starting angle - facing direction of robot + left reach of scan area
+		double angle = ips_yaw + angle_min; //starting angle - facing direction of robot + left reach of scan area
 		int points_added_to_map = 0;
 		int rng_counter = 0;
 
 		for (std::vector<float>::iterator it = laser_scan.ranges.begin();
 				 it != laser_scan.ranges.end(); ++it)
 		{
-			float dist = *it;
-			//ROS_INFO("dist: %f", dist);
+			double dist = *it;
 
 			bool max_range = false;
 			if (dist != dist)
 			{
-				//dist = 4; //check for nan - set as full dist
+				dist = 4; //check for nan - set as full dist
 				max_range = true;
+				continue; //skip nan's
 			}
-			if (dist >= range_min && dist <= 3)//range_max)
+			if (dist >= range_min && dist <= range_max)
 			{
-				//dist = m_to_grid(range_max);
 				dist = m_to_grid(dist);
-				//ROS_INFO("dist: %i\n", int(dist));
 				
 				//find "endpoint" of the current scan.
 				//current position, rotate by (yaw+scan_angle = angle)
@@ -207,7 +203,6 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 				bresenham(start_x, start_y, end_x, end_y, x_clear, y_clear);
 
 				//add bresenham result to map:
-				//int temp_count = 0;
 				int grid_x, grid_y;
 				std::vector<int>::iterator i,j;
 				for (i=x_clear.begin(), j=y_clear.begin(); 
@@ -217,14 +212,10 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 					grid_x = center_x+*i;
 					grid_y = center_y+*j;
 
-					//ROS_INFO("point x,y: (%i, %i)", grid_x, grid_y);
-
 					//check out of bounds
 					if ( grid_x >= map_width*pix_to_m || grid_x < 0 || grid_x >= map_height*pix_to_m || grid_y < 0)
 					{
-						//ROS_INFO("center: x: #%i\n", center_x);
-						//ROS_INFO("x: #%i\n", center_x+*i);
-						//ROS_INFO("y: #%i\n", center_y+*j);
+
 						continue;
 					}
 
@@ -245,19 +236,15 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 					}
 
 				}
-				//if not nan sensor reading,last point (ie the wall), mark as occupied
-				//last point
-				int last_x = center_x+end_x;
-				int last_y = center_y+end_y;
-				//mark_point(&map[(last_y)*row_length + (last_x)], -100);
+
 
 				rng_counter++;
-				//////////////////
+
 			}
 
 			angle += angle_increment;
 		}	
-
+		//ROS_INFO("got scan");
 		nav_msgs::OccupancyGrid newGrid;
 		newGrid.info = info;
 		std::vector<int8_t> a(map, map+(map_width*pix_to_m*map_height*pix_to_m));
@@ -267,13 +254,6 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 
 
 		num_of_scans++;
-		ROS_INFO("got scan #%i", num_of_scans);
-		ROS_INFO("pos: %f, %f", ips_x, ips_y);
-		ROS_INFO("dir: %f", ips_yaw);
-		//ROS_INFO("num of points in range: %i\n", rng_counter);
-		//for(int i=0; i<500; i++)
-			//ROS_INFO("map: pt:%i, val:%i", i, map[i]);
-		//ROS_INFO("pts added to map: %i\n\n", points_added_to_map);
 		laser_counter = 0;
 	}
 	else { laser_counter++; }
@@ -283,6 +263,7 @@ void laser_callback(const sensor_msgs::LaserScan &msg)
 /*
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
 
+  started = true;
   int i;
   for (i = 0; i < msg.name.size(); i++)
     if (msg.name[i] == "mobile_base")
@@ -291,6 +272,7 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
   ips_x = msg.pose[i].position.x;
   ips_y = msg.pose[i].position.y;
   ips_yaw = tf::getYaw(msg.pose[i].orientation);
+  //ROS_INFO("got msg");
 
 }
 */
@@ -298,18 +280,19 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
 
 void pose_callback(const geometry_msgs::PoseWithCovarianceStamped& msg)
 {
+	started = true;
+
+	geometry_msgs::Quaternion quat = msg.pose.pose.orientation;
+	if (abs(quat.x)>1 || abs(quat.y)>1 || abs(quat.z)>1 || abs(quat.w)>1)
+	{
+		//bad msg
+		started = false;
+		ROS_INFO("bad msg");
+		return;
+	}
 	ips_x = msg.pose.pose.position.x; // Robot X psotition
 	ips_y = msg.pose.pose.position.y; // Robot Y psotition
 	ips_yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
-	ROS_DEBUG("pose_callback X: %f Y: %f Yaw: %f", ips_x, ips_y, ips_yaw);
-}
-
-//Callback function for the map
-
-void map_callback(const nav_msgs::OccupancyGrid &msg) {
-    //This function is called when a new map is received
-
-    //you probably want to save the map into a form which is easy to work with
 }
 
 
@@ -321,16 +304,21 @@ int main(int argc, char **argv) {
   ros::NodeHandle n;
 
   //Subscribe to the desired topics and assign callbacks
-  pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
+
+  //REAL      @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+
+  //SIMULATION      @@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  //pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
+  
+
   laser_sub = n.subscribe("/scan", 1, laser_callback);
   //map_sub = n.subscribe("/map", 1, map_callback);
 
-  //Setup topics to Publish from this node
-  velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
   map_pub = n.advertise<nav_msgs::OccupancyGrid>("/occupancy_map",1);
 
   // map metadata info
-	info.resolution = 1.0/float(pix_to_m);
+	info.resolution = 1.0/double(pix_to_m);
 	info.width = pix_to_m*map_width;
 	info.height = pix_to_m*map_height;
 
@@ -357,53 +345,14 @@ int main(int argc, char **argv) {
   //Set the loop rate
   ros::Rate loop_rate(20); //20Hz update rate
 
-
+  ROS_INFO("Program Started");
   //////////test publisher node
   ros::Publisher test_pub = n.advertise<std_msgs::String>("aa",1);
 
 	while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
-
-
-    //move around in a circle
-    vel.linear.x = 0.05;  // set linear speed
-    vel.angular.z = -0.05; // set angular speed
-	//velocity_publisher.publish(vel); // Publish the command velocity
-
-    ///////////////// garbage test
-    std_msgs::String msg;
-    std::stringstream ss;
-    ss << "hi";
-    msg.data = ss.str();
-    test_pub.publish(msg);
   }
 
   return 0;
 }
-
-/*
-while (1)
-{
-	curr_pos = new Vector(sub_IPS_pose); //might need to map to 500x500 or something...
-	facing_direction = vector_to_angle(sub_bot_direction); //might start as a vector, convert to angle wrt "x axis"
-	laser_scan = new LaserScan(sub_bot_direction);
-	
-
-
-	angle = angle_min;
-	for (int i=0; i<ranges.length(); i++)
-	{
-		range = ranges[i];
-		if (range >= range_min && range <= range_max)
-		{
-			angle_ref = facing_direction - angle;
-			start_point = curr_pos;
-			end_point = new Vector(start_point.x * cos(angle_ref), start_point.y * sin(angle_ref));
-
-		}
-		angle += angle_increment;
-	}	
-}
-*/
-
