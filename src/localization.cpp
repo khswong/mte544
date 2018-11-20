@@ -30,7 +30,7 @@ ros::Publisher truepose_publisher;
 
 // Singleton I guess?
 
-#define N_PARTICLES 100
+#define N_PARTICLES 150
 ParticleFilter pf(N_PARTICLES);
 
 geometry_msgs::PoseStamped pfpose;
@@ -44,7 +44,7 @@ Eigen::Vector3d measurement = Eigen::Vector3d::Zero();
 
 short sgn(int x) { return x >= 0 ? 1 : -1; }
 
-#define LIVE 
+// #define LIVE 
 // Callback function for the Position topic (SIMULATION)
 #ifndef LIVE
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
