@@ -109,7 +109,7 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-add_executable(turtlebot_example src/turtlebot_example.cpp)
+add_executable(planning src/planning.cpp)
 add_executable(sim_pose_publisher_node src/sim_pose_publisher.cpp)
 add_executable(vis_pose_publisher_node src/vis_pose_publisher.cpp)
 
