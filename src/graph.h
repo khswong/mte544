@@ -3,6 +3,9 @@
 #include <map>
 #include <vector>
 
+#ifndef GRAPH_H
+#define GRAPH_H
+
 typedef struct Node
 {
   int id;
@@ -25,3 +28,4 @@ class Graph
   bool deleteVertex(Node a);
   bool deleteEdge(Node a, Node b);
 };
+#endif
