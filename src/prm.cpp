@@ -152,6 +152,7 @@ void PrmPlanner::setGoal(Eigen::Vector2d goal) {
       }
     }
   }
+  sampleMilestones();
 }
 
 void PrmPlanner::setPos(Eigen::Vector2d pos) {

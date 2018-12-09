@@ -35,7 +35,7 @@ bool Graph::isReachable(Node a, Node b) {
   std::vector<float> fscore;
   std::vector<float> gscore;
   std::vector<int> comefrom;
-
+  shortest_path.clear();
   openSet.push_back(a.id);
   gscore.push_back(0.0);
   fscore.push_back((a.position - b.position).norm());
