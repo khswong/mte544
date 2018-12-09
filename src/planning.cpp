@@ -9,16 +9,20 @@
 //
 // //////////////////////////////////////////////////////////
 
+
+#include <ros/ros.h>
 #include <gazebo_msgs/ModelStates.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include <ros/ros.h>
 #include <tf/transform_datatypes.h>
 #include <visualization_msgs/Marker.h>
 
-#include <prm.h>
+#include <algorithm>
+#include <eigen3/Eigen/Dense>
+#include "prm.h"
+
 
 ros::Publisher marker_pub;
 
@@ -81,6 +85,7 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
 }
 
 int main(int argc, char **argv) {
+  Eigen::initParallel();
   // Initialize the ROS framework
   ros::init(argc, argv, "main_control");
   ros::NodeHandle n;

@@ -26,20 +26,26 @@ tf::Transform *tform;
 //Callback function for the Position topic (SIMULATION)
 void pose_callback(const gazebo_msgs::ModelStates& msg)
 {
+
+	int i;
+    for (i = 0; i < msg.name.size(); i++)
+        if (msg.name[i] == "mobile_base")
+            break;
+
 	//This function is called when a new position message is received
 	geometry_msgs::PoseWithCovarianceStamped curpose;
 	curpose.header.stamp = ros::Time::now();
 	curpose.header.frame_id="/map";
-	curpose.pose.pose.position = msg.pose[1].position;
-	curpose.pose.pose.orientation = msg.pose[1].orientation;
+	curpose.pose.pose.position = msg.pose[i].position;
+	curpose.pose.pose.orientation = msg.pose[i].orientation;
 	pose_publisher.publish(curpose);
 
 	// send transform
 	br = new tf::TransformBroadcaster;
 	tform = new tf::Transform;
-	tform->setOrigin( tf::Vector3(msg.pose[1].position.x, msg.pose[1].position.y, 0) );
+	tform->setOrigin( tf::Vector3(msg.pose[i].position.x, msg.pose[i].position.y, 0) );
 	tf::Quaternion q;
-	q.setEulerZYX(tf::getYaw(msg.pose[1].orientation), 0, 0);
+	q.setEulerZYX(tf::getYaw(msg.pose[i].orientation), 0, 0);
 	tform->setRotation( q );
 	*tform = tform->inverse();
 	br->sendTransform(tf::StampedTransform(*tform, ros::Time::now(), "base_footprint", "map"));

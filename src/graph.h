@@ -6,22 +6,24 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-typedef struct Node
-{
+typedef struct Node {
   int id;
-  Eigen::Vector3d position;
+  // X, Y co-odinate
+  Eigen::Vector2d position;
+  // The map is indexed w/ this pair
   // std::pair<int, float> (id, distance/cost)
   std::map<int, float> edges;
-}Node;
+} Node;
 
-
-class Graph
-{
+class Graph {
+  int __size = 0;
+  std::vector<int> shortest_path;
   std::map<int, Node> vertices;
- public:
+
+public:
   Graph();
   ~Graph();
-
+  int size();
   bool addVertex(Node a);
   bool addEdge(Node a, Node b);
   bool isReachable(Node a, Node b);
