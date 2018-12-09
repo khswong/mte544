@@ -1,24 +1,28 @@
-#include <ros/ros.h>
-#include <eigen3/Eigen/Dense>
 #include "graph.h"
+#include <eigen3/Eigen/Dense>
+#include <ros/ros.h>
 
 #ifndef PRM_H
 #define PRM_H
-class PrmPlanner
-{
+class PrmPlanner {
   float Resolution;
-  Eigen::Matrix OccupancyMap;
+  Eigen::MatrixXi OccupancyMap;
   Graph Milestones;
   Node Goal;
 
-  void sample();
+  // Steven Lavalle's sampling stuff
+  std::default_random_engine generator;
+
+  void sampleMilestones();
   bool checkCollision();
-  bool checkCollisionMap();
+  bool checkCollisionLine(Node a, Node b);
+  bool checkCollisionMap(Eigen::Vector2d q);
+
 public:
   PrmPlanner();
   ~PrmPlanner();
-  void setMap( std::vector<int> map_data, int width, int height);
-  void setRes( float res);
-  void addGoal( Node goal);
+  void setMap(std::vector<int> map_data, int width, int height);
+  void setRes(float res);
+  void addGoal(Node goal);
 };
 #endif

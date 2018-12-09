@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(turtlebot_example)
 
+
+## Compile as C++11, supported in ROS Kinetic and newer
+add_compile_options(-std=c++11 -g)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -127,7 +131,7 @@ add_executable(vis_pose_publisher_node src/vis_pose_publisher.cpp)
  target_link_libraries(sim_pose_publisher_node
    ${catkin_LIBRARIES}
  )
- target_link_libraries(turtlebot_example
+ target_link_libraries(planning
    ${catkin_LIBRARIES}
  )
 
