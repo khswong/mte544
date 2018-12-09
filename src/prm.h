@@ -10,8 +10,9 @@ class PrmPlanner {
   Graph Milestones;
   Node Goal;
   Node CurPos;
-  // Steven Lavalle's sampling stuff
   std::default_random_engine generator;
+
+  int width, height;
 
   void sampleMilestones();
   bool checkCollision();
@@ -21,10 +22,11 @@ class PrmPlanner {
 public:
   PrmPlanner();
   ~PrmPlanner();
-  void setMap(std::vector<int> map_data, int width, int height);
+  void setMap(std::vector<int> map_data, int w, int h);
   void setRes(float res);
-  void addGoal(Eigen::Vector2d goal);
+  void setGoal(Eigen::Vector2d goal);
   void setPos(Eigen::Vector2d pos);
   float getRes() { return Resolution; };
+
 };
 #endif

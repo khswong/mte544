@@ -1,8 +1,9 @@
+#include "prm.h"
 #include <eigen3/Eigen/Dense>
-#include <prm.h>
 
 #include "graph.h"
 
+short sgn(int x) { return x >= 0 ? 1 : -1; }
 // Bresenham line algorithm (pass empty vectors)
 // Usage: (x0, y0) is the first point and (x1, y1) is the second point. The
 // calculated
@@ -69,27 +70,28 @@ void PrmPlanner::sampleMilestones() {
     Eigen::Vector2d q;
     Eigen::Vector2d q_lavalle;
     // Generate one point
-    q << x_urd(generator) << y_urd(generator);
-    q_lavalle << q(0) + l_nd(generator) << q(1) + l_nd(generator);
+    q << x_urd(generator), y_urd(generator);
+    q_lavalle << q(0) + l_nd(generator), q(1) + l_nd(generator);
     if (checkCollisionMap(q) xor checkCollisionMap(q_lavalle)) {
       q = checkCollisionMap(q) ? q_lavalle : q;
       Node sample;
       sample.position = q;
       sample.id = i;
-      if (Milstones.addVertex(sample)) {
+      if (Milestones.addVertex(sample)) {
         i++;
         // For each v in graph, if straight line from q to v
         // is not interrupted by occupancyGrid, add vertex
         for (std::map<int, Node>::iterator curstone = Milestones.begin();
              curstone != Milestones.end(); ++curstone) {
-          if (((*curstone).position - sample.position).norm() < max_dist &&
-              !checkCollisionLine(curstone, sample)) {
-            Milestones.addEdge((*curstone), sample);
+          Node curnode = (*curstone).second;
+          if ((curnode.position - sample.position).norm() < max_dist &&
+              !checkCollisionLine(curnode, sample)) {
+            Milestones.addEdge(curnode, sample);
           }
         }
       }
     }
-  } while (!Milestones.isReachable(Position, Goal));
+  } while (!Milestones.isReachable(CurPos, Goal));
 }
 
 bool PrmPlanner::checkCollisionLine(Node a, Node b) {
@@ -97,24 +99,27 @@ bool PrmPlanner::checkCollisionLine(Node a, Node b) {
   bresenham(a.position(0), a.position(1), b.position(0), b.position(1), x, y);
   std::vector<int>::iterator x_ptr = x.begin(), y_ptr = y.begin();
   while (x_ptr != x.end() || y_ptr != y.end()) {
-    if (OccupancyMap(x, y) == 1) {
+    if (OccupancyMap(*x_ptr, *y_ptr) == 1) {
       return true;
     }
+    x_ptr++;
+    y_ptr++;
   }
   return false;
 }
 
 // "Monte carlo" collision detection
 // Aka the "I've given up and I've already finished the final" algorithm
-#define robot_radius = 3.0;
+#define robot_radius 3
 #define collision_samples 20
 bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
-  int x = a.position, y = a.position;
+  int x = a(0);
+  int y = a(1);
   if (!OccupancyMap(x, y)) {
-    std::normal_distribution<int> collision_nd(0.0, robot_radius);
-    for (int i = 0; i < collision_samples) {
-      if (OccupancyMap(x + collision_nd(generator),
-                       y + collision_nd(generator))) {
+    std::normal_distribution<double> collision_nd(0.0, robot_radius);
+    for (int i = 0; i < collision_samples; i++) {
+      if (OccupancyMap(x + (int)collision_nd(generator),
+                       y + (int)collision_nd(generator))) {
         return true;
       }
     }
@@ -122,8 +127,10 @@ bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
   }
 }
 
-void PrmPlanner::setMap(std::vector<int> map_data, int width, int height) {
-  Eigen::MatrixXi mapMatrix(height, width);
+void PrmPlanner::setMap(std::vector<int> map_data, int w, int h) {
+  width = w;
+  height = h;
+  Eigen::MatrixXi mapMatrix(width, height);
   for (std::vector<int>::iterator mapIter = map_data.begin();
        mapIter != map_data.begin(); ++mapIter) {
     mapMatrix << (*mapIter);
@@ -132,31 +139,34 @@ void PrmPlanner::setMap(std::vector<int> map_data, int width, int height) {
 }
 
 void PrmPlanner::setGoal(Eigen::Vector2d goal) {
-  // 
   Goal.position = goal;
   Goal.id = Milestones.size() + 1;
   // Try to insert into hash map - if possible, populate edges
   if (Milestones.addVertex(Goal)) {
     for (std::map<int, Node>::iterator curstone = Milestones.begin();
          curstone != Milestones.end(); ++curstone) {
-      if (((*curstone).position - Goal.position).norm() < max_dist &&
-          !checkCollisionLine(curstone, Goal)) {
-        Milestones.addEdge((*curstone), Goal);
+      Node curnode = (*curstone).second;
+      if ((curnode.position - Goal.position).norm() < max_dist &&
+          !checkCollisionLine(curnode, Goal)) {
+        Milestones.addEdge(curnode, Goal);
       }
     }
   }
 }
 
 void PrmPlanner::setPos(Eigen::Vector2d pos) {
+
   CurPos.position = pos;
-  sample.id = Milestones.size() + 1;
+  CurPos.id = Milestones.size() + 1;
   //
   if (Milestones.addVertex(CurPos)) {
     for (std::map<int, Node>::iterator curstone = Milestones.begin();
          curstone != Milestones.end(); ++curstone) {
-      if (((*curstone).position - CurPos.position).norm() < max_dist &&
-          !checkCollisionLine(curstone, CurPos)) {
-        Milestones.addEdge((*curstone), CurPos);
+
+      Node curnode = (*curstone).second;
+      if ((curnode.position - CurPos.position).norm() < max_dist &&
+          !checkCollisionLine(curnode, CurPos)) {
+        Milestones.addEdge(curnode, CurPos);
       }
     }
   }

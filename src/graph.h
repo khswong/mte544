@@ -27,7 +27,9 @@ public:
   bool addVertex(Node a);
   bool addEdge(Node a, Node b);
   bool isReachable(Node a, Node b);
-  bool deleteVertex(Node a);
-  bool deleteEdge(Node a, Node b);
+  void deleteVertex(Node a);
+  void deleteEdge(Node a, Node b);
+  std::map<int, Node>::iterator begin();
+  std::map<int, Node>::iterator end();
 };
 #endif
