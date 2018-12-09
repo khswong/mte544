@@ -85,6 +85,7 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
 }
 
 int main(int argc, char **argv) {
+  Eigen::initParallel();
   // Initialize the ROS framework
   ros::init(argc, argv, "main_control");
   ros::NodeHandle n;

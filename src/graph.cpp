@@ -26,7 +26,21 @@ bool Graph::addEdge(Node a, Node b) {
   }
 }
 
-bool Graph::isReachable(Node a, Node b) { return false; }
+bool Graph::isReachable(Node a, Node b) {
+  std::vector<Node> closedSet;
+  std::vector<Node> openSet;
+  openSet.push_back(a);
+  bool done = false;
+  Node currentNode = a;
+  while (!openSet.empty() || currentNode == b) {
+    
+    for (std::vector<Node>::iterator itr = openSet.begin(); itr != openSet.end(); itr++)
+      {
+      }
+  }
+  return false;
+}
+
 bool Graph::deleteVertex(Node a) { return false; }
 
 bool Graph::deleteEdge(Node a, Node b) { return false; }

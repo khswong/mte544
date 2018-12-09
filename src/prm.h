@@ -9,7 +9,7 @@ class PrmPlanner {
   Eigen::MatrixXi OccupancyMap;
   Graph Milestones;
   Node Goal;
-
+  Node CurPos;
   // Steven Lavalle's sampling stuff
   std::default_random_engine generator;
 
@@ -23,6 +23,8 @@ public:
   ~PrmPlanner();
   void setMap(std::vector<int> map_data, int width, int height);
   void setRes(float res);
-  void addGoal(Node goal);
+  void addGoal(Eigen::Vector2d goal);
+  void setPos(Eigen::Vector2d pos);
+  float getRes() { return Resolution; };
 };
 #endif

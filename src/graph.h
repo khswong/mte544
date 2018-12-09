@@ -17,6 +17,7 @@ typedef struct Node {
 
 class Graph {
   int __size = 0;
+  std::vector<int> shortest_path;
   std::map<int, Node> vertices;
 
 public:
