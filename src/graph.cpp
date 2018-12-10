@@ -3,6 +3,7 @@
 #include "graph.h"
 #include <algorithm>
 #include <eigen3/Eigen/Dense>
+#include <ros/ros.h>
 
 float calculateCost(Node a, Node b) { return (a.position - b.position).norm(); }
 
@@ -30,6 +31,7 @@ bool Graph::addEdge(Node a, Node b) {
 
 // A* graph search
 bool Graph::isReachable(Node a, Node b) {
+  ROS_INFO("RUN A*");
   std::vector<int> closedSet;
   std::vector<int> openSet;
   std::vector<float> fscore;
@@ -41,25 +43,42 @@ bool Graph::isReachable(Node a, Node b) {
   fscore.push_back((a.position - b.position).norm());
   int current = a.id;
 
-  while (!openSet.empty() || current != b.id) {
+  while (!openSet.empty()) {
+    ROS_INFO("openset.length: %d", openSet.size());
+
+    ROS_INFO("current: %d", current);
+    ROS_INFO("b id: %d", b.id);
+    ROS_INFO("NOT EXIT CONDITION YET");
+    ros::Duration(0.1).sleep();
 
     current = *std::min_element(openSet.begin(), openSet.end());
-    openSet.push_back(current);
+    if (current == b.id)
+    {
+      break;
+    }
+    openSet.erase( std::find(openSet.begin(), openSet.end(), current) );
     closedSet.push_back(current);
 
+    ROS_INFO("current node %d", current);
     Node currentNode = this->vertices.find(current)->second;
     // For neighbours beside currentnode
+
     for (std::map<int, float>::iterator itr = currentNode.edges.begin();
          itr != currentNode.edges.end(); ++itr) {
+    
       const int neighbour = (*itr).first;
+      ROS_INFO("Check neighbour %d", neighbour);
+    
       // And of those neighbours is not within the closed set
       if (std::find(closedSet.begin(), closedSet.end(), neighbour) !=
           closedSet.end()) {
         if (std::find(closedSet.begin(), closedSet.end(), neighbour) !=
             closedSet.end()) {
+          
           openSet.push_back(neighbour);
         } else if ( gscore[current] + ((*currentNode.edges.find(neighbour)).second) >
                    gscore[neighbour]) {
+          ROS_INFO("Found some thing");
 
           // Insert the distance from the beginning
           gscore.insert(gscore.begin(), neighbour,
@@ -77,6 +96,8 @@ bool Graph::isReachable(Node a, Node b) {
       }
     }
   }
+
+  ROS_INFO("EXITED\n");
   if (current == b.id) {
     shortest_path.push_back(current);
     while (current != a.id)

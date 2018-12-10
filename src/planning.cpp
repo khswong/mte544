@@ -28,7 +28,9 @@ static PrmPlanner prm_planner;
 #define TAGID 0
 
 double X, Y, Yaw;
-double theta;
+bool map_is_setup = false;
+std::vector<Eigen::Vector2d> waypoints;
+
 
 // Callback function for the Position topic (LIVE)
 
@@ -79,17 +81,50 @@ void drawCurve(int k) {
   marker_pub.publish(lines);
 }
 
+inline void setupPRM()
+{
+  // Setup PRM
+  std::vector<Eigen::Vector2d> goals;
+  goals.push_back(Eigen::Vector2d(8, 0)); // push end point into stack first
+  goals.push_back(Eigen::Vector2d(8, -4));
+  goals.push_back(Eigen::Vector2d(4, 0));
+  goals.push_back(Eigen::Vector2d(0, 0)); // Starting point
+ROS_INFO("frick 0");
+  std::vector<Eigen::Vector2d> campaign;
+  for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
+       itr != goals.end(); itr++) 
+  {
+    ROS_INFO("frick 1");
+    prm_planner.setPos(*itr);
+    ROS_INFO("frick 2");
+    ROS_INFO("%f %f", (*itr)(0), (*itr)(1));
+    prm_planner.setGoal(*(itr + 1)); //breaks here
+    ROS_INFO("frick 3");
+    campaign = prm_planner.getPath();
+    ROS_INFO("frick 4");
+    waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
+    ROS_INFO("frick 5");
+  }
+
+  map_is_setup = true;
+  ROS_INFO("SET UP MAP.");
+}
+
 // Callback function for the map
 void map_callback(const nav_msgs::OccupancyGrid &msg) {
   // This function is called when a new map is received
 
   // you probably want to save the map into a form which is easy to work with
+  ROS_INFO("GOT MAP:..");
   prm_planner.setMap(msg.data,  (int)msg.info.width, (int)msg.info.height);
   prm_planner.setRes(msg.info.resolution);
+  setupPRM();
+
 }
 
+
 int main(int argc, char **argv) {
-  Eigen::initParallel();
+  //Eigen::initParallel();
   // Initialize the ROS framework
   ros::init(argc, argv, "main_control");
   ros::NodeHandle n;
@@ -124,23 +159,6 @@ int main(int argc, char **argv) {
 
   */
 
-  // Setup PRM
-  std::vector<Eigen::Vector2d> goals;
-  goals.push_back(Eigen::Vector2d(8, 0)); // push end point into stack first
-  goals.push_back(Eigen::Vector2d(8, -4));
-  goals.push_back(Eigen::Vector2d(4, 0));
-  goals.push_back(Eigen::Vector2d(0, 0)); // Starting point
-
-  std::vector<Eigen::Vector2d> waypoints;
-  std::vector<Eigen::Vector2d> campaign;
-  for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
-       itr != goals.end(); itr++) {
-    prm_planner.setPos(*itr);
-    prm_planner.setGoal(*(itr + 1));
-    campaign = prm_planner.getPath();
-    waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
-  }
-
   double rad2deg = 360 / (2 * M_PI);
   double deg2rad = 2 * M_PI / 360;
 
@@ -153,14 +171,16 @@ int main(int argc, char **argv) {
 
   // Set the loop rate
   ros::Rate loop_rate(20); // 20Hz update rate
+  ROS_INFO("~~START~~ ^-^");
 
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
 
-    while (waypoints.empty())
-      ; // Just stop if no waypoints
+    while (!map_is_setup); // Wait until a map is set up
+    while (waypoints.empty()); // Just stop if no waypoints
 
+    ROS_INFO("LOOPED ONCE.");
     // current goal
     Eigen::Vector2d currentGoal = *waypoints.begin();
     dx = currentGoal(0) - X;
@@ -169,23 +189,20 @@ int main(int argc, char **argv) {
 
     if (std::abs(dist_to_pt) > tolerance) {
       // Move towards next goal
-
       angle_to_pt = atan2(dy, dx);
+      ROS_INFO("MOVING TOWARDS NEXT GOAL. dist:%f, angle:%f", dist_to_pt, angle_to_pt);
       double angle_diff =
           std::fmod((angle_to_pt - Yaw + M_PI), (2 * M_PI)) - M_PI;
       if (std::abs(angle_diff) > angle_tolerance) {
         ///////////// Rotate first
-        // theta += angle_diff*angle_gain;
         vel.angular.z = angle_diff * angle_gain;
         vel.linear.x = 0;
         vel.linear.y = 0;
       } else {
         ///////////// Move towards point
-        // curr_x += speed*cos(theta);
-        // curr_y += speed*sin(theta);
         vel.angular.z = 0;
-        vel.linear.x = speed * cos(theta);
-        vel.linear.y = speed * sin(theta);
+        vel.linear.x = speed * cos(Yaw);
+        vel.linear.y = speed * sin(Yaw);
       }
 
     } else {
