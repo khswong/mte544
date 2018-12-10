@@ -83,22 +83,23 @@ void drawCurve(int k) {
 
 inline void setupPRM()
 {
+  Eigen::Vector2d offset;
+  offset << 1, 5;
   // Setup PRM
   std::vector<Eigen::Vector2d> goals;
-  goals.push_back(Eigen::Vector2d(8, 0)); // push end point into stack first
-  goals.push_back(Eigen::Vector2d(8, -4));
-  goals.push_back(Eigen::Vector2d(4, 0));
-  goals.push_back(Eigen::Vector2d(0, 0)); // Starting point
-ROS_INFO("frick 0");
+  goals.push_back(Eigen::Vector2d(X,Y));
+
+  goals.push_back(Eigen::Vector2d(4, 0) + offset);
+  goals.push_back(Eigen::Vector2d(8, 0) + offset);
+  goals.push_back(Eigen::Vector2d(8, -4) + offset);
+  
   std::vector<Eigen::Vector2d> campaign;
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
-       itr != goals.end(); itr++) 
+       itr != goals.end(); itr++)
   {
-    ROS_INFO("frick 1");
     prm_planner.setPos(*itr);
-    ROS_INFO("frick 2");
-    ROS_INFO("%f %f", (*itr)(0), (*itr)(1));
     prm_planner.setGoal(*(itr + 1)); //breaks here
+    //prm_planner.sampleMilestones();
     ROS_INFO("frick 3");
     campaign = prm_planner.getPath();
     ROS_INFO("frick 4");

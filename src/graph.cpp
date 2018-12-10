@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <eigen3/Eigen/Dense>
 #include <ros/ros.h>
+#include <sstream>
 
 float calculateCost(Node a, Node b) { return (a.position - b.position).norm(); }
 
@@ -28,89 +29,6 @@ bool Graph::addEdge(Node a, Node b) {
   }
 }
 
-
-// A* graph search
-bool Graph::isReachable(Node a, Node b) {
-  ROS_INFO("RUN A*");
-  std::vector<int> closedSet;
-  std::vector<int> openSet;
-  std::vector<float> fscore;
-  std::vector<float> gscore;
-  std::vector<int> comefrom;
-  shortest_path.clear();
-  openSet.push_back(a.id);
-  gscore.push_back(0.0);
-  fscore.push_back((a.position - b.position).norm());
-  int current = a.id;
-
-  while (!openSet.empty()) {
-    ROS_INFO("openset.length: %d", openSet.size());
-
-    ROS_INFO("current: %d", current);
-    ROS_INFO("b id: %d", b.id);
-    ROS_INFO("NOT EXIT CONDITION YET");
-    ros::Duration(0.1).sleep();
-
-    current = *std::min_element(openSet.begin(), openSet.end());
-    if (current == b.id)
-    {
-      break;
-    }
-    openSet.erase( std::find(openSet.begin(), openSet.end(), current) );
-    closedSet.push_back(current);
-
-    ROS_INFO("current node %d", current);
-    Node currentNode = this->vertices.find(current)->second;
-    // For neighbours beside currentnode
-
-    for (std::map<int, float>::iterator itr = currentNode.edges.begin();
-         itr != currentNode.edges.end(); ++itr) {
-    
-      const int neighbour = (*itr).first;
-      ROS_INFO("Check neighbour %d", neighbour);
-    
-      // And of those neighbours is not within the closed set
-      if (std::find(closedSet.begin(), closedSet.end(), neighbour) !=
-          closedSet.end()) {
-        if (std::find(closedSet.begin(), closedSet.end(), neighbour) !=
-            closedSet.end()) {
-          
-          openSet.push_back(neighbour);
-        } else if ( gscore[current] + ((*currentNode.edges.find(neighbour)).second) >
-                   gscore[neighbour]) {
-          ROS_INFO("Found some thing");
-
-          // Insert the distance from the beginning
-          gscore.insert(gscore.begin(), neighbour,
-                        gscore[current] + (*currentNode.edges.find(neighbour)).second);
-
-          // Insert the distance to the end (heuristic)
-          fscore.insert(
-              fscore.begin(), neighbour,
-              gscore[neighbour] +
-                  ((*vertices.find(neighbour)).second.position - b.position)
-                      .norm());
-
-          comefrom[neighbour] = current;
-        }
-      }
-    }
-  }
-
-  ROS_INFO("EXITED\n");
-  if (current == b.id) {
-    shortest_path.push_back(current);
-    while (current != a.id)
-      {
-        current = comefrom[current];
-        shortest_path.push_back(current);
-      }
-    return true;
-  } else {
-    return false;
-  }
-}
-
 void Graph::deleteVertex(Node a) {
   for (std::map<int, Node>::iterator itr = vertices.begin();
        itr != vertices.end(); ++itr) {
@@ -124,8 +42,68 @@ void Graph::deleteEdge(Node a, Node b) {
   b.edges.erase(a.edges.find(b.id));
 }
 
-std::vector<int> Graph::getPath(){ return shortest_path; }
-Eigen::Vector2d Graph::getNode(int id){return (*vertices.find(id)).second.position;}
+std::vector<Eigen::Vector2d>
+Graph::reconstruct_path(std::map<int, int> camefrom, int current) {
+  std::vector<Eigen::Vector2d> total_path;
+  total_path.push_back(vertices[current].position);
+  while (camefrom[current]) {
+    current = camefrom[current];
+    total_path.push_back(vertices[current].position);
+  }
+  return total_path;
+}
+
+std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
+  ROS_INFO("RUN A*");
+  std::vector<int> closedSet;
+  std::vector<int> openSet;
+  std::map<int, float> fscore;
+  std::map<int, float> gscore;
+  std::map<int, int> comefrom;
+
+  ROS_INFO("a %d x: %d y %d", a.id, (int)a.position(0), (int)a.position(1));
+  ROS_INFO("b %d x: %d y %d", b.id, (int)b.position(0), (int)b.position(1));
+  for (std::map<int, float>::iterator itr = a.edges.begin();
+       itr != a.edges.end(); ++itr) {
+    ROS_INFO("Edges for %d: %d", a.id, (*itr).first);
+  }
+  shortest_path.clear();
+  openSet.push_back(a.id);
+  gscore[a.id] = 0;
+  fscore[a.id] = (a.position - b.position).norm();
+  while (!openSet.empty()) {
+    std::sort(openSet.begin(), openSet.end(),
+                [&fscore](int a, int b) { return fscore[a] < fscore[b]; });
+    int current = *openSet.end();
+    openSet.pop_back();
+    if (current == b.id) {
+      return reconstruct_path(comefrom, current);
+    }
+    ROS_INFO("Current ID: %d", current);
+    closedSet.push_back(current);
+    Node currentNode = vertices[current];
+    for (std::map<int, float>::iterator itr = currentNode.edges.begin();
+         itr != currentNode.edges.end(); itr++) {
+      int neighbour = (*itr).first;
+      if (std::find(closedSet.begin(), closedSet.end(), neighbour) != closedSet.end()) {
+        float temp_gscore = gscore[current] + currentNode.edges[current];
+        if (std::find(openSet.begin(), openSet.end(), neighbour) != openSet.end()) {
+          ROS_INFO("Add to openset: %d", neighbour);
+          openSet.push_back(neighbour);
+        } else if (!(temp_gscore >= gscore[neighbour])) {
+          comefrom[neighbour] = current;
+          gscore[neighbour] = temp_gscore;
+          fscore[neighbour] = gscore[neighbour];
+        }
+      }
+    }
+  }
+  return std::vector<Eigen::Vector2d>();
+}
+
+Eigen::Vector2d Graph::getNode(int id) {
+  return (*vertices.find(id)).second.position;
+}
 
 std::map<int, Node>::iterator Graph::begin() { return vertices.begin(); }
 

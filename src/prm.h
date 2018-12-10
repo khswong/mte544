@@ -14,7 +14,6 @@ class PrmPlanner {
 
   int width, height;
 
-  void sampleMilestones();
   bool checkCollision();
   bool checkCollisionLine(Node a, Node b);
   bool checkCollisionMap(Eigen::Vector2d q);
@@ -22,6 +21,7 @@ class PrmPlanner {
 public:
   PrmPlanner(){};
   ~PrmPlanner(){};
+  void sampleMilestones();
   void setMap(std::vector<signed char> map_data, int w, int h);
   void setRes(float res);
   void setGoal(Eigen::Vector2d goal);
