@@ -172,3 +172,16 @@ void PrmPlanner::setPos(Eigen::Vector2d pos) {
     }
   }
 }
+
+std::vector<Eigen::Vector2d> PrmPlanner::getPath() {
+
+  std::vector<int> waypoints = Milestones.getPath();
+  std::vector<Eigen::Vector2d> path;
+
+  for (int i=0; i<waypoints.length; i++)
+  {
+    Eigen::Vector2d goal = *std::find(Milestones.begin(), Milestones.end(), waypoints[i]).position;
+    goal /= Resolution;
+    path.push_back();
+  }
+}

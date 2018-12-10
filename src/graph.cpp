@@ -103,6 +103,8 @@ void Graph::deleteEdge(Node a, Node b) {
   b.edges.erase(a.edges.find(b.id));
 }
 
+std::vector<int> Graph::getPath(){ return shortest_path; }
+
 std::map<int, Node>::iterator Graph::begin() { return vertices.begin(); }
 
 std::map<int, Node>::iterator Graph::end() { return vertices.end(); }

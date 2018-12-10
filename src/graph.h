@@ -24,6 +24,7 @@ public:
   Graph();
   ~Graph();
   int size();
+  std::vector<int> getPath();
   bool addVertex(Node a);
   bool addEdge(Node a, Node b);
   bool isReachable(Node a, Node b);
