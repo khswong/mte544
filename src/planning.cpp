@@ -6,6 +6,14 @@
 // inputs and outputs needed for this lab
 //
 // Author: James Servos
+
+
+/*
+catkin_make
+rosrun map_server map_server map_sim.yaml
+rosrun turtlebot_example planning
+roslaunch turtlebot_example turtlebot_gazebo.launch
+*/
 //
 // //////////////////////////////////////////////////////////
 
@@ -21,6 +29,8 @@
 #include "prm.h"
 #include <algorithm>
 #include <eigen3/Eigen/Dense>
+using std::showpoint;
+using std::fixed;
 
 ros::Publisher marker_pub;
 static PrmPlanner prm_planner;
@@ -34,13 +44,18 @@ std::vector<Eigen::Vector2d> waypoints;
 
 // Callback function for the Position topic (LIVE)
 
-void pose_callback(const geometry_msgs::PoseWithCovarianceStamped &msg) {
+void pose_callback(const gazebo_msgs::ModelStates &msg) {
   // This function is called when a new position message is received
-  X = msg.pose.pose.position.x;                // Robot X psotition
-  Y = msg.pose.pose.position.y;                // Robot Y psotition
-  Yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
+  int i;
+  for (i = 0; i < msg.name.size(); i++)
+    if (msg.name[i] == "mobile_base")
+      break;
 
-  std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl;
+  X = msg.pose[i].position.x;                // Robot X psotition
+  Y = msg.pose[i].position.y;                // Robot Y psotition
+  Yaw = tf::getYaw(msg.pose[i].orientation); // Robot Yaw
+
+  //std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl;
 }
 
 // Example of drawing a curve
@@ -83,6 +98,7 @@ void drawCurve(int k) {
 
 inline void setupPRM()
 {
+#ifdef 1
   Eigen::Vector2d offset;
   offset << 1, 5;
   // Setup PRM
@@ -93,6 +109,34 @@ inline void setupPRM()
   goals.push_back(Eigen::Vector2d(8, 0) + offset);
   goals.push_back(Eigen::Vector2d(8, -4) + offset);
   
+#else
+
+  double pts[] =
+  {
+    0, 0,  // start point
+    0, -4,
+    6, -4,
+    6, -2,
+    5, -1,
+    4, -1,
+    4, 0,  // first waypoint
+    4, -1,
+    5, -1,
+    6, -3,
+    8, -4, // second waypoint
+    6, -3,
+    6, -1,
+    8, 0  // final waypoint
+    
+  };
+  // Setup PRM
+  for (int i=0; i<sizeof(pts)/sizeof(pts[i]); i+=2)
+  {
+    waypoints.push_back(Eigen::Vector2d(pts[i], pts[i+1]));
+  }  
+  
+  ROS_INFO("frick 0");
+#endif
   std::vector<Eigen::Vector2d> campaign;
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
        itr != goals.end(); itr++)
@@ -106,7 +150,7 @@ inline void setupPRM()
     waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
     ROS_INFO("frick 5");
   }
-
+  //waypoints = goals;
   map_is_setup = true;
   ROS_INFO("SET UP MAP.");
 }
@@ -132,7 +176,7 @@ int main(int argc, char **argv) {
 
   // Subscribe to the desired topics and assign callbacks
   ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
-  ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+  ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
 
   // Setup topics to Publish from this node
   ros::Publisher velocity_publisher =
@@ -164,12 +208,17 @@ int main(int argc, char **argv) {
   double deg2rad = 2 * M_PI / 360;
 
   double tolerance = 0.25;
-  double angle_tolerance = 5 * deg2rad;
-  double speed = 0.1;
+  double angle_tolerance = 15 * deg2rad;
+  double angle_tolerance2 = 10 * deg2rad;
+  double base_angle_speed = 0.1;
+  double speed_gain = 0.05;
+  double base_speed = 0.5;
   double angle_gain = 0.5;
 
-  double dx, dy, dist_to_pt, angle_to_pt;
+  double dx, dy, dist_to_pt, angle_to_pt, angle_diff;
 
+  bool need_to_rotate = false;
+  bool done_rotation = false;
   // Set the loop rate
   ros::Rate loop_rate(20); // 20Hz update rate
   ROS_INFO("~~START~~ ^-^");
@@ -177,11 +226,11 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
+    std::cout<<"\n\n WAYPTS: "<<waypoints.size();
 
-    while (!map_is_setup); // Wait until a map is set up
+    //while (!map_is_setup); // Wait until a map is set up
     while (waypoints.empty()); // Just stop if no waypoints
 
-    ROS_INFO("LOOPED ONCE.");
     // current goal
     Eigen::Vector2d currentGoal = *waypoints.begin();
     dx = currentGoal(0) - X;
@@ -191,25 +240,49 @@ int main(int argc, char **argv) {
     if (std::abs(dist_to_pt) > tolerance) {
       // Move towards next goal
       angle_to_pt = atan2(dy, dx);
-      ROS_INFO("MOVING TOWARDS NEXT GOAL. dist:%f, angle:%f", dist_to_pt, angle_to_pt);
-      double angle_diff =
-          std::fmod((angle_to_pt - Yaw + M_PI), (2 * M_PI)) - M_PI;
-      if (std::abs(angle_diff) > angle_tolerance) {
-        ///////////// Rotate first
-        vel.angular.z = angle_diff * angle_gain;
-        vel.linear.x = 0;
-        vel.linear.y = 0;
-      } else {
-        ///////////// Move towards point
-        vel.angular.z = 0;
-        vel.linear.x = speed * cos(Yaw);
-        vel.linear.y = speed * sin(Yaw);
+      angle_diff =
+          std::fmod((angle_to_pt - Yaw + 3*M_PI), (2 * M_PI)) - M_PI;
+      
+      if (std::abs(angle_diff) > angle_tolerance)
+      {
+        need_to_rotate = true;
       }
+      if (need_to_rotate && done_rotation == false) {
+        ///////////// Rotate first
+        if (std::abs(angle_diff) < angle_tolerance2)
+        {
+          done_rotation = true;
+          need_to_rotate = false;
+        }
+        std::cout<<"\n ROTATING";
+        std::cout<<"\n  angle_to_pt: "<< angle_to_pt*rad2deg
+          <<"\n  angle diff: "<< angle_diff*rad2deg
+          <<"\n  pt-yaw "<< (angle_to_pt - Yaw)*rad2deg
+          <<"\n   +pi " << (angle_to_pt - Yaw + M_PI)*rad2deg
+          <<"\n  fmod:" << std::fmod((angle_to_pt-Yaw+M_PI),(2*M_PI))*rad2deg;
+        int sign = angle_diff/std::abs(angle_diff);
+        vel.angular.z = base_angle_speed*sign + angle_diff*angle_gain;
+        vel.linear.x = 0;
+      }
+      else {
+        done_rotation = false;
+        ///////////// Move towards point
+        std::cout<<"\n MOVING STRAIGHT";
+        vel.angular.z = 0;
+        vel.linear.x = base_speed + speed_gain*dist_to_pt;
+      }
+      
 
     } else {
-      // Reached the current goal, move onto next one.
-      waypoints.pop_back();
+      // Reached the goal, move onto next one.
+      waypoints.erase(waypoints.begin());
+      currentGoal = *waypoints.begin();
     }
+
+    std::cout << showpoint << fixed;
+    std::cout<<"\nRobot: x:"<<X<<" y:"<<Y<<" angle:"<<Yaw*rad2deg; 
+    std::cout<<"\nTarg:  x:"<<currentGoal(0)<<" y:"<<currentGoal(1)<<" dist: "<<dist_to_pt<<" ang_dif:"<<angle_diff*rad2deg;
+    std::cout<<"\nSpeed: x:"<<vel.linear.x<<" y:"<<vel.linear.y<<" angle:"<<vel.angular.z;
 
     velocity_publisher.publish(vel); // Publish the command velocity
   }
