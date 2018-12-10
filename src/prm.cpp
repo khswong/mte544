@@ -127,11 +127,11 @@ bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
   }
 }
 
-void PrmPlanner::setMap(std::vector<int> map_data, int w, int h) {
+void PrmPlanner::setMap(std::vector<signed char> map_data, int w, int h) {
   width = w;
   height = h;
   Eigen::MatrixXi mapMatrix(width, height);
-  for (std::vector<int>::iterator mapIter = map_data.begin();
+  for (std::vector<signed char>::iterator mapIter = map_data.begin();
        mapIter != map_data.begin(); ++mapIter) {
     mapMatrix << (*mapIter);
   }
@@ -178,10 +178,12 @@ std::vector<Eigen::Vector2d> PrmPlanner::getPath() {
   std::vector<int> waypoints = Milestones.getPath();
   std::vector<Eigen::Vector2d> path;
 
-  for (int i=0; i<waypoints.length; i++)
+  for (std::vector<int>::iterator itr = waypoints.begin(); itr != waypoints.end(); itr++)
   {
-    Eigen::Vector2d goal = *std::find(Milestones.begin(), Milestones.end(), waypoints[i]).position;
+    Eigen::Vector2d goal = Milestones.getNode(*itr);
     goal /= Resolution;
-    path.push_back();
+    path.push_back(goal);
   }
 }
+
+void PrmPlanner::setRes(float res){Resolution = res;}

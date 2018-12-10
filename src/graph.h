@@ -21,10 +21,11 @@ class Graph {
   std::map<int, Node> vertices;
 
 public:
-  Graph();
-  ~Graph();
+  Graph(){};
+  ~Graph(){};
   int size();
   std::vector<int> getPath();
+  Eigen::Vector2d getNode(int id);
   bool addVertex(Node a);
   bool addEdge(Node a, Node b);
   bool isReachable(Node a, Node b);

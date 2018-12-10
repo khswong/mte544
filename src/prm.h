@@ -20,14 +20,14 @@ class PrmPlanner {
   bool checkCollisionMap(Eigen::Vector2d q);
 
 public:
-  PrmPlanner();
-  ~PrmPlanner();
-  void setMap(std::vector<int> map_data, int w, int h);
+  PrmPlanner(){};
+  ~PrmPlanner(){};
+  void setMap(std::vector<signed char> map_data, int w, int h);
   void setRes(float res);
   void setGoal(Eigen::Vector2d goal);
   void setPos(Eigen::Vector2d pos);
   float getRes() { return Resolution; };
-  std::vector<Eigen::Vector2d> PrmPlanner::getPath();
+  std::vector<Eigen::Vector2d> getPath();
 
 
 };

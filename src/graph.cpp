@@ -104,6 +104,7 @@ void Graph::deleteEdge(Node a, Node b) {
 }
 
 std::vector<int> Graph::getPath(){ return shortest_path; }
+Eigen::Vector2d Graph::getNode(int id){return (*vertices.find(id)).second.position;}
 
 std::map<int, Node>::iterator Graph::begin() { return vertices.begin(); }
 
