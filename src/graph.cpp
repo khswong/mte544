@@ -110,7 +110,7 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
       //                  vertices[neighbour].position(1));
       if (std::find(closedSet.begin(), closedSet.end(), neighbour) ==
           closedSet.end()) {
-        float temp_gscore = gscore[current] + currentNode.edges[current];
+        float temp_gscore = gscore[current] + currentNode.edges[neighbour];
         if (std::find(openSet.begin(), openSet.end(), neighbour) ==
             openSet.end()) {
           openSet.push_back(neighbour);
