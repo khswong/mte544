@@ -236,8 +236,8 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
   points.color.a = 1.0;
 
   line_strip.color.b = 1.0f;
-  line_strip.color.a = 1.0;
-
+  line_strip.color.a = 1.0f;
+  
   double height = 0.1;
   double dh = 0;
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();

@@ -56,30 +56,32 @@ void bresenham(int x0, int y0, int x1, int y1, std::vector<int> &x,
   }
 }
 
-#define max_dist 50
-#define l_distribution 10
+#define max_dist 20
+#define l_distribution 5.0
 #define num_particles 250
 void PrmPlanner::sampleMilestones() {
   // Lavalle's nonuniform sampling algorithm
   // Uniform randomly
   std::uniform_real_distribution<double> x_urd(0.0, OccupancyMap.rows());
   std::uniform_real_distribution<double> y_urd(0.0, OccupancyMap.cols());
-  std::normal_distribution<double> l_nd(0.0, 1);
+  std::normal_distribution<double> l_nd(0.0, l_distribution);
   do {
     // Choose random point q
     Eigen::Vector2d q;
     Eigen::Vector2d q_lavalle;
     // Generate one point
     q << x_urd(generator), y_urd(generator);
-    q_lavalle << q(0) + l_nd(generator), q(1) + l_nd(generator);
-    if (!checkCollisionMap(q)) { //  xor checkCollisionMap(q_lavalle)) {
-      //q = checkCollisionMap(q) ? q_lavalle : q;
+    double x_lavalle = std::max((double)OccupancyMap.rows() - 1,
+                                std::min(0.0, q(0) + l_nd(generator)));
+    double y_lavalle = std::max((double)OccupancyMap.cols() - 1,
+                                std::min(0.0, q(1) + l_nd(generator)));
+    q_lavalle << x_lavalle, y_lavalle;
+    if (checkCollisionMap(q) xor checkCollisionMap(q_lavalle)) {
+      q = checkCollisionMap(q) ? q_lavalle : q;
       Node sample;
       sample.position = q;
+
       if (Milestones.addVertex(sample)) {
-        // ROS_INFO("ADD NEW POINTS %d", sample.id);
-        // ROS_INFO("NEW POINT x %d y %d", (int)sample.position(0),
-        //         (int)sample.position(1));
         // For each v in graph, if straight line from q to v
         // is not interrupted by occupancyGrid, add vertex
         __milestones.push_back(q);
@@ -111,13 +113,14 @@ bool PrmPlanner::checkCollisionLine(Node a, Node b) {
   // std::vector<int> &y)
   bresenham((int)(a.position(0)), (int)(a.position(1)), (int)(b.position(0)),
             (int)(b.position(1)), x, y);
-  //ROS_INFO("Check line between %f %f and %f %f", a.position(0), a.position(1),
+  // ROS_INFO("Check line between %f %f and %f %f", a.position(0),
+  // a.position(1),
   //         b.position(0), b.position(1));
   std::vector<int>::iterator x_ptr = x.begin(), y_ptr = y.begin();
   while (x_ptr != x.end() || y_ptr != y.end()) {
     Eigen::Vector2d point;
     point << *(x_ptr), *(y_ptr);
-    //ROS_INFO("x y of line %d %d", (*x_ptr), (*y_ptr));
+    // ROS_INFO("x y of line %d %d", (*x_ptr), (*y_ptr));
     if (checkCollisionMap(point)) {
       //  ROS_INFO("Line collision");
       return true;
@@ -140,8 +143,7 @@ bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
   // Is it within the thing?
   if (OccupancyMap(x, y) > thresh) {
     return true;
-  }
-  else {
+  } else {
     // Check a bunch of points within a radius to see if it collides
     std::normal_distribution<double> collision_nd(0.0, robot_radius);
     for (int i = 0; i < collision_samples; i++) {
@@ -155,10 +157,10 @@ bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
         // ROS_INFO("Collision at %d %d", temp_x, temp_y);
         return true;
       }
-      }
+    }
     // ROS_INFO("We ok");
     return false;
-    }
+  }
 }
 
 void PrmPlanner::setMap(std::vector<signed char> map_data, int w, int h) {
@@ -229,14 +231,6 @@ std::vector<Eigen::Vector2d> PrmPlanner::getPath() {
   std::transform(milestone_path.begin(), milestone_path.end(), path.begin(),
                  [this](Eigen::Vector2d a) { return a * this->Resolution; });
   std::stringstream debug_info;
-  if (!path.empty()) {
-    debug_info << "Path: ";
-    for (std::vector<Eigen::Vector2d>::iterator itr = path.begin();
-         itr != path.end(); itr++) {
-      debug_info << " (" << (*itr).transpose() << "), ";
-    }
-    ROS_INFO("%s", debug_info.str().c_str());
-  }
   std::reverse(path.begin(), path.end());
   return path;
 }

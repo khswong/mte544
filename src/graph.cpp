@@ -51,15 +51,15 @@ std::vector<Eigen::Vector2d>
 Graph::reconstruct_path(std::map<int, int> camefrom, int current, int start) {
   std::vector<Eigen::Vector2d> total_path;
   // total_path.push_back(vertices[start].position);
-  std::stringstream ss;
-  ss << "Path: ";
+  //std::stringstream ss;
+  //ss << "Path: ";
   total_path.push_back(vertices[current].position);
   while (camefrom[current]) {
     current = camefrom[current];
     total_path.push_back(vertices[current].position);
-    ss << current << " ";
+    //ss << current << " ";
   }
-  ROS_INFO("%s", ss.str().c_str());
+  //ROS_INFO("%s", ss.str().c_str());
   return total_path;
 }
 
