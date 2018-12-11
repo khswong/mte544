@@ -7,7 +7,6 @@
 //
 // Author: James Servos
 
-
 /*
 catkin_make
 rosrun map_server map_server map_sim.yaml
@@ -41,7 +40,6 @@ double X, Y, Yaw;
 bool map_is_setup = false;
 std::vector<Eigen::Vector2d> waypoints;
 
-
 // Callback function for the Position topic (LIVE)
 
 void pose_callback(const gazebo_msgs::ModelStates &msg) {
@@ -55,7 +53,7 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
   Y = msg.pose[i].position.y;                // Robot Y psotition
   Yaw = tf::getYaw(msg.pose[i].orientation); // Robot Yaw
 
-  //std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl;
+  // std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl;
 }
 
 // Example of drawing a curve
@@ -96,61 +94,46 @@ void drawCurve(int k) {
   marker_pub.publish(lines);
 }
 
-inline void setupPRM()
-{
-#ifdef 1
+inline void setupPRM() {
+#if 1
   Eigen::Vector2d offset;
   offset << 1, 5;
   // Setup PRM
   std::vector<Eigen::Vector2d> goals;
-  goals.push_back(Eigen::Vector2d(X,Y));
-
+  goals.push_back(Eigen::Vector2d(X, Y) + offset);
   goals.push_back(Eigen::Vector2d(4, 0) + offset);
   goals.push_back(Eigen::Vector2d(8, 0) + offset);
   goals.push_back(Eigen::Vector2d(8, -4) + offset);
-  
+
 #else
 
-  double pts[] =
-  {
-    0, 0,  // start point
-    0, -4,
-    6, -4,
-    6, -2,
-    5, -1,
-    4, -1,
-    4, 0,  // first waypoint
-    4, -1,
-    5, -1,
-    6, -3,
-    8, -4, // second waypoint
-    6, -3,
-    6, -1,
-    8, 0  // final waypoint
-    
+  double pts[] = {
+      0, 0,                                    // start point
+      0, -4, 6, -4, 6, -2, 5, -1, 4, -1, 4, 0, // first waypoint
+      4, -1, 5, -1, 6, -3, 8, -4,              // second waypoint
+      6, -3, 6, -1, 8, 0                       // final waypoint
+
   };
   // Setup PRM
-  for (int i=0; i<sizeof(pts)/sizeof(pts[i]); i+=2)
-  {
-    waypoints.push_back(Eigen::Vector2d(pts[i], pts[i+1]));
-  }  
-  
+  for (int i = 0; i < sizeof(pts) / sizeof(pts[i]); i += 2) {
+    waypoints.push_back(Eigen::Vector2d(pts[i], pts[i + 1]));
+  }
+
   ROS_INFO("frick 0");
 #endif
   std::vector<Eigen::Vector2d> campaign;
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
-       itr != goals.end(); itr++)
-  {
+       itr != goals.end() - 1; itr++) {
     prm_planner.setPos(*itr);
-    prm_planner.setGoal(*(itr + 1)); //breaks here
-    //prm_planner.sampleMilestones();
+    prm_planner.setGoal(*(std::next(itr, 1))); // breaks here
+    // prm_planner.sampleMilestones();
     ROS_INFO("frick 3");
     campaign = prm_planner.getPath();
     ROS_INFO("frick 4");
     waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
     ROS_INFO("frick 5");
   }
-  //waypoints = goals;
+  // waypoints = goals;
   map_is_setup = true;
   ROS_INFO("SET UP MAP.");
 }
@@ -161,22 +144,21 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
 
   // you probably want to save the map into a form which is easy to work with
   ROS_INFO("GOT MAP:..");
-  prm_planner.setMap(msg.data,  (int)msg.info.width, (int)msg.info.height);
+  prm_planner.setMap(msg.data, (int)msg.info.width, (int)msg.info.height);
   prm_planner.setRes(msg.info.resolution);
   setupPRM();
-
 }
 
-
 int main(int argc, char **argv) {
-  //Eigen::initParallel();
+  // Eigen::initParallel();
   // Initialize the ROS framework
   ros::init(argc, argv, "main_control");
   ros::NodeHandle n;
 
   // Subscribe to the desired topics and assign callbacks
   ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
-  ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
+  ros::Subscriber pose_sub =
+      n.subscribe("/gazebo/model_states", 1, pose_callback);
 
   // Setup topics to Publish from this node
   ros::Publisher velocity_publisher =
@@ -226,10 +208,11 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
-    std::cout<<"\n\n WAYPTS: "<<waypoints.size();
+    std::cout << "\n\n WAYPTS: " << waypoints.size();
 
-    //while (!map_is_setup); // Wait until a map is set up
-    while (waypoints.empty()); // Just stop if no waypoints
+    // while (!map_is_setup); // Wait until a map is set up
+    while (waypoints.empty())
+      ; // Just stop if no waypoints
 
     // current goal
     Eigen::Vector2d currentGoal = *waypoints.begin();
@@ -240,38 +223,34 @@ int main(int argc, char **argv) {
     if (std::abs(dist_to_pt) > tolerance) {
       // Move towards next goal
       angle_to_pt = atan2(dy, dx);
-      angle_diff =
-          std::fmod((angle_to_pt - Yaw + 3*M_PI), (2 * M_PI)) - M_PI;
-      
-      if (std::abs(angle_diff) > angle_tolerance)
-      {
+      angle_diff = std::fmod((angle_to_pt - Yaw + 3 * M_PI), (2 * M_PI)) - M_PI;
+
+      if (std::abs(angle_diff) > angle_tolerance) {
         need_to_rotate = true;
       }
       if (need_to_rotate && done_rotation == false) {
-        ///////////// Rotate first
-        if (std::abs(angle_diff) < angle_tolerance2)
-        {
+        // Rotate first
+        if (std::abs(angle_diff) < angle_tolerance2) {
           done_rotation = true;
           need_to_rotate = false;
         }
-        std::cout<<"\n ROTATING";
-        std::cout<<"\n  angle_to_pt: "<< angle_to_pt*rad2deg
-          <<"\n  angle diff: "<< angle_diff*rad2deg
-          <<"\n  pt-yaw "<< (angle_to_pt - Yaw)*rad2deg
-          <<"\n   +pi " << (angle_to_pt - Yaw + M_PI)*rad2deg
-          <<"\n  fmod:" << std::fmod((angle_to_pt-Yaw+M_PI),(2*M_PI))*rad2deg;
-        int sign = angle_diff/std::abs(angle_diff);
-        vel.angular.z = base_angle_speed*sign + angle_diff*angle_gain;
+        std::cout << "\n ROTATING";
+        std::cout << "\n  angle_to_pt: " << angle_to_pt * rad2deg
+                  << "\n  angle diff: " << angle_diff * rad2deg << "\n  pt-yaw "
+                  << (angle_to_pt - Yaw) * rad2deg << "\n   +pi "
+                  << (angle_to_pt - Yaw + M_PI) * rad2deg << "\n  fmod:"
+                  << std::fmod((angle_to_pt - Yaw + M_PI), (2 * M_PI)) *
+                         rad2deg;
+        int sign = angle_diff / std::abs(angle_diff);
+        vel.angular.z = base_angle_speed * sign + angle_diff * angle_gain;
         vel.linear.x = 0;
-      }
-      else {
+      } else {
         done_rotation = false;
         ///////////// Move towards point
-        std::cout<<"\n MOVING STRAIGHT";
+        std::cout << "\n MOVING STRAIGHT";
         vel.angular.z = 0;
-        vel.linear.x = base_speed + speed_gain*dist_to_pt;
+        vel.linear.x = base_speed + speed_gain * dist_to_pt;
       }
-      
 
     } else {
       // Reached the goal, move onto next one.
@@ -280,9 +259,11 @@ int main(int argc, char **argv) {
     }
 
     std::cout << showpoint << fixed;
-    std::cout<<"\nRobot: x:"<<X<<" y:"<<Y<<" angle:"<<Yaw*rad2deg; 
-    std::cout<<"\nTarg:  x:"<<currentGoal(0)<<" y:"<<currentGoal(1)<<" dist: "<<dist_to_pt<<" ang_dif:"<<angle_diff*rad2deg;
-    std::cout<<"\nSpeed: x:"<<vel.linear.x<<" y:"<<vel.linear.y<<" angle:"<<vel.angular.z;
+    std::cout << "\nRobot: x:" << X << " y:" << Y << " angle:" << Yaw * rad2deg;
+    std::cout << "\nTarg:  x:" << currentGoal(0) << " y:" << currentGoal(1)
+              << " dist: " << dist_to_pt << " ang_dif:" << angle_diff * rad2deg;
+    std::cout << "\nSpeed: x:" << vel.linear.x << " y:" << vel.linear.y
+              << " angle:" << vel.angular.z;
 
     velocity_publisher.publish(vel); // Publish the command velocity
   }

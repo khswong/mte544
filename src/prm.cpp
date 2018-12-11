@@ -2,6 +2,7 @@
 #include "graph.h"
 #include <eigen3/Eigen/Dense>
 #include <ros/ros.h>
+#include <sstream>
 
 short sgn(int x) { return x >= 0 ? 1 : -1; }
 // Bresenham line algorithm (pass empty vectors)
@@ -55,17 +56,15 @@ void bresenham(int x0, int y0, int x1, int y1, std::vector<int> &x,
   }
 }
 
-#define max_dist 10
+#define max_dist 20
 #define l_distribution 10
-#define num_particles 1000
+#define num_particles 500
 void PrmPlanner::sampleMilestones() {
-  int i = Milestones.size() + 1;
   // Lavalle's nonuniform sampling algorithm
   // Uniform randomly
   std::uniform_real_distribution<double> x_urd(0.0, OccupancyMap.rows());
   std::uniform_real_distribution<double> y_urd(0.0, OccupancyMap.cols());
   std::normal_distribution<double> l_nd(0.0, 1);
-  // While s and g are not connected
   do {
     // Choose random point q
     Eigen::Vector2d q;
@@ -77,10 +76,8 @@ void PrmPlanner::sampleMilestones() {
       // q = checkCollisionMap(q) ? q_lavalle : q;
       Node sample;
       sample.position = q;
-      sample.id = i;
       if (Milestones.addVertex(sample)) {
-        i++;
-        //ROS_INFO("ADD NEW POINTS %d", i);
+        //ROS_INFO("ADD NEW POINTS %d", sample.id);
         //ROS_INFO("NEW POINT x %d y %d", (int)sample.position(0),
         //         (int)sample.position(1));
         // For each v in graph, if straight line from q to v
@@ -88,21 +85,25 @@ void PrmPlanner::sampleMilestones() {
         for (std::map<int, Node>::iterator curstone = Milestones.begin();
              curstone != Milestones.end(); ++curstone) {
           Node curnode = (*curstone).second;
+          // ROS_INFO("Dist to sample %f", (curnode.position - sample.position).norm() );
           if ((curnode.position - sample.position).norm() < max_dist &&
               !checkCollisionLine(curnode, sample) && curnode.id != sample.id) {
             Milestones.addEdge(curnode, sample);
-            //ROS_INFO("ADD EDGES BETWEEN %d and %d", curnode.id, sample.id);
+            if (sample.id == Goal.id)
+              {
+                ROS_INFO("ADD EDGES BETWEEN %d and %d", curnode.id, sample.id);
+              }
           }
         }
       } else {
         ROS_INFO("Can't add point");
       }
     }
-  } while (Milestones.size() < num_particles);
-  ROS_INFO("done sampling");
+  }while(getPath().empty());
+  ROS_INFO("done sampling: %d nodes", Milestones.size());
 }
 
-#define thresh 20
+#define thresh 90
 bool PrmPlanner::checkCollisionLine(Node a, Node b) {
   std::vector<int> x, y;
   bresenham(a.position(0), a.position(1), b.position(0), b.position(1), x, y);
@@ -111,6 +112,7 @@ bool PrmPlanner::checkCollisionLine(Node a, Node b) {
     Eigen::Vector2d point;
     point << *(x_ptr), *(y_ptr);
     if (checkCollisionMap(point)) {
+      //ROS_INFO("Line collision");
       return true;
     }
     x_ptr++;
@@ -124,27 +126,33 @@ bool PrmPlanner::checkCollisionLine(Node a, Node b) {
 #define robot_radius 1
 #define collision_samples 20
 bool PrmPlanner::checkCollisionMap(Eigen::Vector2d a) {
-  int x = std::min((int)OccupancyMap.rows()-1, std::max(0, (int)a(0)));
-  int y = std::min((int)OccupancyMap.cols()-1, std::max(0, (int)a(1)));
+  int x = std::min((int)OccupancyMap.rows() - 1, std::max(0, (int)a(0)));
+  int y = std::min((int)OccupancyMap.cols() - 1, std::max(0, (int)a(1)));
   // ROS_INFO("Check collision map");
   // ROS_INFO("x y %d %d", x, y);
-  //ROS_INFO("Size of Map x: %d y: %d", OccupancyMap.rows(), OccupancyMap.cols());
-  //ROS_INFO("What is here at (x,y) %d", OccupancyMap(x, y));
-  if (OccupancyMap(x, y) > thresh) {
+  // ROS_INFO("Size of Map x: %d y: %d", OccupancyMap.rows(),
+  // OccupancyMap.cols());
+  // ROS_INFO("What is here at (%d,%d) %d", x, y, OccupancyMap(x, y));
+  if (OccupancyMap(x, y) > thresh)
+    {
+      // ROS_INFO("Collision at %d %d", x, y);
+      return true;
+    }
+   else{
     std::normal_distribution<double> collision_nd(0.0, robot_radius);
     for (int i = 0; i < collision_samples; i++) {
 
       int temp_x = x + (int)collision_nd(generator);
-      temp_x = std::min((int)OccupancyMap.rows()-1, std::max(0, (int)temp_x));
+      temp_x = std::min((int)OccupancyMap.rows() - 1, std::max(0, (int)temp_x));
       int temp_y = y + (int)collision_nd(generator);
-      temp_y = std::min((int)OccupancyMap.rows()-1, std::max(0, (int)temp_y));
-      //ROS_INFO("Check %d %d", temp_x, temp_y);
+      temp_y = std::min((int)OccupancyMap.rows() - 1, std::max(0, (int)temp_y));
+      // ROS_INFO("Check %d %d", temp_x, temp_y);
       if (OccupancyMap(temp_x, temp_y) > thresh) {
         //ROS_INFO("Collision at %d %d", temp_x, temp_y);
         return true;
       }
     }
-    ROS_INFO("We ok");
+    //ROS_INFO("We ok");
     return false;
   }
 }
@@ -154,17 +162,22 @@ void PrmPlanner::setMap(std::vector<signed char> map_data, int w, int h) {
   width = w;
   height = h;
   std::vector<int> map_data_i(map_data.begin(), map_data.end());
-  Eigen::MatrixXi mapMatrix(width, height) ;
-  OccupancyMap = Eigen::Map<Eigen::Matrix<int, 100, 100> > (map_data_i.data());
+  Eigen::MatrixXi mapMatrix(width, height);
+  OccupancyMap = Eigen::Map<Eigen::Matrix<int, 100, 100>>(map_data_i.data());
   // ROS_INFO("Size of Map x: %d y: %d", OccupancyMap.rows(),
   // OccupancyMap.cols());
+  std::stringstream om_ss;
+  om_ss << OccupancyMap;
+  //ROS_INFO("OccupancyMap %s", om_ss.str().c_str());
 }
 
 void PrmPlanner::setGoal(Eigen::Vector2d goal) {
+  Goal.position = goal * (1 / Resolution);
+  checkCollisionMap(Goal.position);
+  int x  =(int)Goal.position(0);
+  int y = (int)Goal.position(1);
 
-  ROS_INFO("SetGoal");
-  Goal.position = goal * (1/Resolution);
-  Goal.id = Milestones.size() + 1;
+  ROS_INFO("What is here at (%d,%d) %d", x, y, OccupancyMap(x, y));
   // Try to insert into hash map - if possible, populate edges
   if (Milestones.addVertex(Goal)) {
     for (std::map<int, Node>::iterator curstone = Milestones.begin();
@@ -172,6 +185,7 @@ void PrmPlanner::setGoal(Eigen::Vector2d goal) {
       Node curnode = (*curstone).second;
       if ((curnode.position - Goal.position).norm() < max_dist &&
           !checkCollisionLine(curnode, Goal)) {
+        // ROS_INFO("Add edge to goal %d", Goal.id);
         Milestones.addEdge(curnode, Goal);
       }
     }
@@ -181,8 +195,11 @@ void PrmPlanner::setGoal(Eigen::Vector2d goal) {
 
 void PrmPlanner::setPos(Eigen::Vector2d pos) {
 
-  CurPos.position = pos * (1/Resolution);
-  CurPos.id = Milestones.size() + 1;
+  CurPos.position = pos * (1 / Resolution);
+  int x = (int)CurPos.position(0);
+  int y = (int)CurPos.position(1);
+  ROS_INFO("What is here at (%d,%d) %d", x, y, OccupancyMap(x, y));
+  checkCollisionMap(CurPos.position);
   if (Milestones.addVertex(CurPos)) {
     for (std::map<int, Node>::iterator curstone = Milestones.begin();
          curstone != Milestones.end(); ++curstone) {
@@ -197,6 +214,14 @@ void PrmPlanner::setPos(Eigen::Vector2d pos) {
 }
 
 std::vector<Eigen::Vector2d> PrmPlanner::getPath() {
+  std::vector<Eigen::Vector2d> path = Milestones.getPath(CurPos, Goal);
+  std::stringstream debug_info;
+  debug_info << "Path: ";
+  for (std::vector<Eigen::Vector2d>::iterator itr = path.begin(); itr != path.end(); itr++)
+    {
+      debug_info << " "<< (*itr);
+    }
+  ROS_INFO("%s", debug_info.str().c_str());
   return Milestones.getPath(CurPos, Goal);
 }
 
