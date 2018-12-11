@@ -237,9 +237,9 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
 
   line_strip.color.b = 1.0f;
   line_strip.color.a = 1.0f;
-  
+
   double height = 0.1;
-  double dh = 0;
+  double dh = 0.0;
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
        itr != goals.end(); itr++) {
     geometry_msgs::Point p;
@@ -249,9 +249,21 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
     std::vector<Eigen::Vector2d>::iterator ind =
         std::find(waypoints.begin(), waypoints.end(), *itr);
     int index = ind - waypoints.begin();
-    p.z = 0; // height + index * dh;
+    p.z = height + index * dh;
     points.points.push_back(p);
   }
+
+  geometry_msgs::Point p, p2;
+  p.x = 0;
+  p.y = 0;
+  p.z = height;
+  height += dh;
+  std::vector<Eigen::Vector2d>::iterator dupe = waypoints.begin();
+  p2.x = (*dupe)(0);
+  p2.y = (*dupe)(1);
+  p2.z = height;
+  line_strip.points.push_back(p);
+  line_strip.points.push_back(p2);
 
   for (std::vector<Eigen::Vector2d>::iterator itr = waypoints.begin();
        itr != waypoints.end() - 1; itr++) {
