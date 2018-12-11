@@ -20,14 +20,14 @@ class Graph {
   std::vector<int> shortest_path;
   std::map<int, Node> vertices;
   std::vector<Eigen::Vector2d> reconstruct_path(std::map<int, int> camefrom,
-                                                int current);
+                                                int current, int start);
 
 public:
   Graph(){};
   ~Graph(){};
   int size();
   std::vector<Eigen::Vector2d> getPath(Node a, Node b);
-  Eigen::Vector2d getNode(int id);
+  Node getNode(int id);
   bool addVertex(Node &a);
   bool addEdge(Node &a, Node &b);
   //bool isReachable(Node a, Node b);

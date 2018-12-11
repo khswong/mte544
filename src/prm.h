@@ -11,14 +11,13 @@ class PrmPlanner {
   Node Goal;
   Node CurPos;
   std::default_random_engine generator;
-
+  std::vector<Eigen::Vector2d> __milestones;
   int width, height;
 
-  bool checkCollision();
+ public:
+  
   bool checkCollisionLine(Node a, Node b);
   bool checkCollisionMap(Eigen::Vector2d q);
-
-public:
   PrmPlanner(){};
   ~PrmPlanner(){};
   void sampleMilestones();
@@ -27,6 +26,7 @@ public:
   void setGoal(Eigen::Vector2d goal);
   void setPos(Eigen::Vector2d pos);
   float getRes() { return Resolution; };
+  std::vector<Eigen::Vector2d> getMilestones() {return __milestones;};
   Eigen::MatrixXi getOccupancyMap() {return OccupancyMap;};
   std::vector<Eigen::Vector2d> getPath();
 
