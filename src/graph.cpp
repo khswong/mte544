@@ -71,12 +71,17 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
   std::map<int, float> gscore;
   std::map<int, int> comefrom;
   std::stringstream debug_info;
-  for (std::map<int, Node>::iterator itr = vertices.begin();
-       itr != vertices.end(); itr++) {
-    debug_info << "Node: " << (*itr).first
-               << " Position :" << (*itr).second.position << std::endl;
-    debug_info.str("");
+
+  /*
+  ROS_INFO("a %d x: %d y %d edges %d", a.id, (int)a.position(0),
+  (int)a.position(1), vertices[a.id].edges.size());
+  ROS_INFO("b %d x: %d y %d edges %d", b.id, (int)b.position(0),
+  (int)b.position(1), vertices[b.id].edges.size());
+  for (std::map<int, float>::iterator itr = vertices[a.id].edges.begin();
+       itr != vertices[a.id].edges.end(); ++itr) {
+       ROS_INFO("Edges for %d: %d", a.id, (*itr).first);
   }
+  */
 
   shortest_path.clear();
   openSet.push_back(a.id);
@@ -94,12 +99,15 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
     closedSet.push_back(current);
     for (std::map<int, float>::iterator itr = vertices[current].edges.begin();
          itr != vertices[current].edges.end(); ++itr) {
-      ROS_INFO("Edges for %d: %d", current, (*itr).first);
+      //  ROS_INFO("Edges for %d: %d", current, (*itr).first);
     }
     Node currentNode = vertices[current];
     for (std::map<int, float>::iterator itr = currentNode.edges.begin();
          itr != currentNode.edges.end(); itr++) {
       int neighbour = (*itr).first;
+      // ROS_INFO("Check neighbour %d %f %f", neighbour,
+      // vertices[neighbour].position(0),
+      //                  vertices[neighbour].position(1));
       if (std::find(closedSet.begin(), closedSet.end(), neighbour) ==
           closedSet.end()) {
         float temp_gscore = gscore[current] + currentNode.edges[current];
@@ -107,10 +115,14 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
             openSet.end()) {
           openSet.push_back(neighbour);
         }
+        if (gscore[neighbour] == 0 ) gscore[neighbour] = temp_gscore + 1;
         if ((temp_gscore <= gscore[neighbour])) {
           comefrom[neighbour] = current;
           gscore[neighbour] = temp_gscore;
-          fscore[neighbour] = gscore[neighbour];
+          fscore[neighbour] =
+              gscore[neighbour] +
+              (vertices[neighbour].position - vertices[neighbour].position)
+                  .norm();
         }
       }
     }

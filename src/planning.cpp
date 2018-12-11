@@ -131,7 +131,6 @@ inline void setupPRM() {
   // goals.push_back(Eigen::Vector2d(8,0));
 
   goals.push_back(Eigen::Vector2d(0, 0));
-  //goals.push_back(Eigen::Vector2d(0, -2));
   goals.push_back(Eigen::Vector2d(4, 0));
   goals.push_back(Eigen::Vector2d(8, -4));
   goals.push_back(Eigen::Vector2d(8, 0));
