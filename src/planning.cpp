@@ -40,6 +40,7 @@ static PrmPlanner prm_planner;
 double X, Y, Yaw;
 bool map_is_setup = false;
 std::vector<Eigen::Vector2d> waypoints;
+visualization_msgs::Marker points, line_strip;
 
 
 // Callback function for the Position topic (LIVE)
@@ -123,8 +124,12 @@ inline void setupPRM()
     waypoints.push_back(Eigen::Vector2d(pts[i], pts[i+1]));
   }  
   
-  ROS_INFO("frick 0");
-  std::vector<Eigen::Vector2d> campaign;
+  std::vector<Eigen::Vector2d> goals;
+  goals.push_back(Eigen::Vector2d(0,0));
+  goals.push_back(Eigen::Vector2d(4,0));
+  goals.push_back(Eigen::Vector2d(8,-4));
+  goals.push_back(Eigen::Vector2d(8,0));
+
   /*
   for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
        itr != goals.end(); itr++) 
@@ -144,6 +149,66 @@ inline void setupPRM()
   //waypoints = goals;
   map_is_setup = true;
   ROS_INFO("SET UP MAP.");
+
+  // MARKER STUFF
+
+    points.header.frame_id = line_strip.header.frame_id = "/map";
+    points.header.stamp = line_strip.header.stamp = ros::Time::now();
+    points.ns = line_strip.ns = "points_and_lines";
+    points.action = line_strip.action = visualization_msgs::Marker::ADD;
+    //points.pose.orientation.w = line_strip.orientation.w = 1.0;
+
+    points.id = 0;
+    line_strip.id = 1;
+
+    points.type = visualization_msgs::Marker::POINTS;
+    line_strip.type = visualization_msgs::Marker::LINE_STRIP;
+
+    points.scale.x = 0.2;
+    points.scale.y = 0.2;
+    line_strip.scale.x = 0.1;
+
+    points.color.g = 1.0f;
+    points.color.a = 1.0;
+
+    line_strip.color.b = 1.0f;
+    line_strip.color.a = 1.0;
+
+    double height = 0.1;
+    double dh = 0.2;
+    for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
+       itr != goals.end(); itr++) 
+    {
+      geometry_msgs::Point p;
+      p.x = (*itr)(0)-4;
+      p.y = (*itr)(1);
+      std::vector<Eigen::Vector2d>::iterator ind = std::find(waypoints.begin(), waypoints.end(), *itr);
+      int index = ind-waypoints.begin();
+      p.z = height+index*dh;
+      points.points.push_back(p);
+    }
+
+    for (std::vector<Eigen::Vector2d>::iterator itr = waypoints.begin();
+       itr != waypoints.end()-1; itr++) 
+    {
+      geometry_msgs::Point p, p2;
+      p.x = (*itr)(0)-4;
+      p.y = (*itr)(1);
+      p.z = height;
+      height += dh;
+      std::vector<Eigen::Vector2d>::iterator dupe = std::next(itr,1);
+      p2.x = (*dupe)(0)-4;
+      p2.y = (*dupe)(1);
+      p2.z = height;
+      line_strip.points.push_back(p);
+      line_strip.points.push_back(p2);
+      
+    }
+
+
+// MARKER STUFF END  
+
+
 }
 
 // Callback function for the map
@@ -154,8 +219,8 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
   ROS_INFO("GOT MAP:..");
   prm_planner.setMap(msg.data,  (int)msg.info.width, (int)msg.info.height);
   prm_planner.setRes(msg.info.resolution);
-  setupPRM();
 
+  setupPRM();
 }
 
 
@@ -217,10 +282,14 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
-    std::cout<<"\n\n WAYPTS: "<<waypoints.size();
+    std::cout<<"\n\n WAYPTS: "<<waypoints.size();  
 
     //while (!map_is_setup); // Wait until a map is set up
-    while (waypoints.empty()); // Just stop if no waypoints
+    if (waypoints.empty()){
+      // Just stop if no waypoints
+      ros::shutdown();
+    }
+
 
     // current goal
     Eigen::Vector2d currentGoal = *waypoints.begin();
@@ -276,6 +345,10 @@ int main(int argc, char **argv) {
     std::cout<<"\nSpeed: x:"<<vel.linear.x<<" y:"<<vel.linear.y<<" angle:"<<vel.angular.z;
 
     velocity_publisher.publish(vel); // Publish the command velocity
+
+    // Publish the RVIZ visualization
+    marker_pub.publish(points);
+    marker_pub.publish(line_strip);
   }
 
   return 0;
