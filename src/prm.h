@@ -27,6 +27,7 @@ public:
   void setGoal(Eigen::Vector2d goal);
   void setPos(Eigen::Vector2d pos);
   float getRes() { return Resolution; };
+  Eigen::MatrixXi getOccupancyMap() {return OccupancyMap;};
   std::vector<Eigen::Vector2d> getPath();
 
 

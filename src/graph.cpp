@@ -57,7 +57,7 @@ Graph::reconstruct_path(std::map<int, int> camefrom, int current) {
 }
 
 std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
-  ROS_INFO("RUN A*");
+ // ROS_INFO("RUN A*");
   std::vector<int> closedSet;
   std::vector<int> openSet;
   std::map<int, float> fscore;
@@ -71,11 +71,11 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
     // ROS_INFO("%s", debug_info.str().c_str());
     debug_info.str("");
   }
-  ROS_INFO("%s", debug_info.str().c_str());
-  ROS_INFO("a %d x: %d y %d edges %d", a.id, (int)a.position(0),
-  (int)a.position(1), vertices[a.id].edges.size());
-  ROS_INFO("b %d x: %d y %d edges %d", b.id, (int)b.position(0),
-  (int)b.position(1), vertices[b.id].edges.size());
+  //ROS_INFO("%s", debug_info.str().c_str());
+  //ROS_INFO("a %d x: %d y %d edges %d", a.id, (int)a.position(0),
+  //(int)a.position(1), vertices[a.id].edges.size());
+  //ROS_INFO("b %d x: %d y %d edges %d", b.id, (int)b.position(0),
+  //(int)b.position(1), vertices[b.id].edges.size());
   for (std::map<int, float>::iterator itr = vertices[a.id].edges.begin();
        itr != vertices[a.id].edges.end(); ++itr) {
     ROS_INFO("Edges for %d: %d", a.id, (*itr).first);
@@ -94,19 +94,19 @@ std::vector<Eigen::Vector2d> Graph::getPath(Node a, Node b) {
     if (current == b.id) {
       return reconstruct_path(comefrom, current);
     }
-    ROS_INFO("Current ID: %d", current);
-    // ROS_INFO("OpenSet size %d", openSet.size());
+  //  ROS_INFO("Current ID: %d", current);
+  //  ROS_INFO("OpenSet size %d", openSet.size());
     closedSet.push_back(current);
     Node currentNode = vertices[current];
     for (std::map<int, float>::iterator itr = currentNode.edges.begin();
          itr != currentNode.edges.end(); itr++) {
       int neighbour = (*itr).first;
-      ROS_INFO("Check neighbour %d", neighbour);
+  //    ROS_INFO("Check neighbour %d", neighbour);
       if (std::find(closedSet.begin(), closedSet.end(), neighbour) ==
           closedSet.end()) {
         float temp_gscore = gscore[current] + currentNode.edges[current];
         if ( std::find(openSet.begin(), openSet.end(), neighbour) == openSet.end() ) {
-          ROS_INFO("Add to openset: %d", neighbour);
+  //        ROS_INFO("Add to openset: %d", neighbour);
           openSet.push_back(neighbour);
         } else if ((temp_gscore >= gscore[neighbour])) {
           comefrom[neighbour] = current;

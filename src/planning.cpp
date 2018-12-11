@@ -41,7 +41,9 @@ double X, Y, Yaw;
 bool map_is_setup = false;
 std::vector<Eigen::Vector2d> waypoints;
 visualization_msgs::Marker points, line_strip;
+std::vector<Eigen::Vector2d> goals;
 
+int COMMENT = 0;
 
 // Callback function for the Position topic (LIVE)
 
@@ -52,8 +54,8 @@ void pose_callback(const gazebo_msgs::ModelStates &msg) {
     if (msg.name[i] == "mobile_base")
       break;
 
-  X = msg.pose[i].position.x;                // Robot X psotition
-  Y = msg.pose[i].position.y;                // Robot Y psotition
+  X = msg.pose[i].position.x;                // Robot X position
+  Y = msg.pose[i].position.y;                // Robot Y position
   Yaw = tf::getYaw(msg.pose[i].orientation); // Robot Yaw
 
   //std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl;
@@ -97,6 +99,21 @@ void drawCurve(int k) {
   marker_pub.publish(lines);
 }
 
+Eigen::Vector2d myTransform(Eigen::Vector2d v)
+{
+  //top left corner
+  double x = v(0)+1;
+  double y = v(1)+5;
+  return Eigen::Vector2d(x,y);
+}
+
+Eigen::Vector2d myReverseTransform(Eigen::Vector2d v)
+{
+  double x = v(0)-1;
+  double y = v(1)-5;
+  return Eigen::Vector2d(x,y);
+}
+
 inline void setupPRM()
 {
 
@@ -119,96 +136,52 @@ inline void setupPRM()
     
   };
   // Setup PRM
-  for (int i=0; i<sizeof(pts)/sizeof(pts[i]); i+=2)
-  {
-    waypoints.push_back(Eigen::Vector2d(pts[i], pts[i+1]));
-  }  
-  
-  std::vector<Eigen::Vector2d> goals;
+
+  //goals.push_back(Eigen::Vector2d(0,0));
+  //goals.push_back(Eigen::Vector2d(4,0));
+  //goals.push_back(Eigen::Vector2d(8,-4));
+  //goals.push_back(Eigen::Vector2d(8,0));
+
   goals.push_back(Eigen::Vector2d(0,0));
   goals.push_back(Eigen::Vector2d(4,0));
   goals.push_back(Eigen::Vector2d(8,-4));
   goals.push_back(Eigen::Vector2d(8,0));
 
-  /*
-  for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
-       itr != goals.end(); itr++) 
+  if (0)
   {
-    ROS_INFO("frick 1");
-    prm_planner.setPos(*itr);
-    ROS_INFO("frick 2");
-    ROS_INFO("%f %f", (*itr)(0), (*itr)(1));
-    prm_planner.setGoal(*(itr + 1)); //breaks here
-    ROS_INFO("frick 3");
-    campaign = prm_planner.getPath();
-    ROS_INFO("frick 4");
-    waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
-    ROS_INFO("frick 5");
+    for (int i=0; i<sizeof(pts)/sizeof(pts[i]); i+=2)
+    {
+      waypoints.push_back(Eigen::Vector2d(pts[i], pts[i+1]));
+    }  
   }
-*/
-  //waypoints = goals;
+  else 
+  {
+
+    std::vector<Eigen::Vector2d> campaign;
+    for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
+         itr != goals.end(); itr++) 
+    {
+      //ROS_INFO("frick 1");
+      prm_planner.setPos(myTransform(*itr));
+      //ROS_INFO("frick 2");
+      //ROS_INFO("%f %f", (*itr)(0), (*itr)(1));
+      prm_planner.setGoal(myTransform(*(itr + 1))); //breaks here
+      //ROS_INFO("frick 3");
+      campaign = prm_planner.getPath();
+      //ROS_INFO("frick 4");
+      for (std::vector<Eigen::Vector2d>::iterator itr2 = campaign.begin();
+        itr2 != campaign.end(); itr2++)
+      {
+        Eigen::Vector2d adjusted = myReverseTransform(*itr2);
+        waypoints.insert(waypoints.end(), adjusted);
+        //waypoints.insert(waypoints.end(), campaign.begin(), campaign.end());
+      }
+      //ROS_INFO("frick 5");
+    }
+  }
+
   map_is_setup = true;
   ROS_INFO("SET UP MAP.");
-
-  // MARKER STUFF
-
-    points.header.frame_id = line_strip.header.frame_id = "/map";
-    points.header.stamp = line_strip.header.stamp = ros::Time::now();
-    points.ns = line_strip.ns = "points_and_lines";
-    points.action = line_strip.action = visualization_msgs::Marker::ADD;
-    //points.pose.orientation.w = line_strip.orientation.w = 1.0;
-
-    points.id = 0;
-    line_strip.id = 1;
-
-    points.type = visualization_msgs::Marker::POINTS;
-    line_strip.type = visualization_msgs::Marker::LINE_STRIP;
-
-    points.scale.x = 0.2;
-    points.scale.y = 0.2;
-    line_strip.scale.x = 0.1;
-
-    points.color.g = 1.0f;
-    points.color.a = 1.0;
-
-    line_strip.color.b = 1.0f;
-    line_strip.color.a = 1.0;
-
-    double height = 0.1;
-    double dh = 0.2;
-    for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
-       itr != goals.end(); itr++) 
-    {
-      geometry_msgs::Point p;
-      p.x = (*itr)(0)-4;
-      p.y = (*itr)(1);
-      std::vector<Eigen::Vector2d>::iterator ind = std::find(waypoints.begin(), waypoints.end(), *itr);
-      int index = ind-waypoints.begin();
-      p.z = height+index*dh;
-      points.points.push_back(p);
-    }
-
-    for (std::vector<Eigen::Vector2d>::iterator itr = waypoints.begin();
-       itr != waypoints.end()-1; itr++) 
-    {
-      geometry_msgs::Point p, p2;
-      p.x = (*itr)(0)-4;
-      p.y = (*itr)(1);
-      p.z = height;
-      height += dh;
-      std::vector<Eigen::Vector2d>::iterator dupe = std::next(itr,1);
-      p2.x = (*dupe)(0)-4;
-      p2.y = (*dupe)(1);
-      p2.z = height;
-      line_strip.points.push_back(p);
-      line_strip.points.push_back(p2);
-      
-    }
-
-
-// MARKER STUFF END  
-
-
 }
 
 // Callback function for the map
@@ -219,8 +192,66 @@ void map_callback(const nav_msgs::OccupancyGrid &msg) {
   ROS_INFO("GOT MAP:..");
   prm_planner.setMap(msg.data,  (int)msg.info.width, (int)msg.info.height);
   prm_planner.setRes(msg.info.resolution);
+  prm_planner.getOccupancyMap();
 
   setupPRM();
+
+  // MARKER STUFF
+
+  points.header.frame_id = line_strip.header.frame_id = "/map";
+  points.header.stamp = line_strip.header.stamp = ros::Time::now();
+  points.ns = line_strip.ns = "points_and_lines";
+  points.action = line_strip.action = visualization_msgs::Marker::ADD;
+  //points.pose.orientation.w = line_strip.orientation.w = 1.0;
+
+  points.id = 0;
+  line_strip.id = 1;
+
+  points.type = visualization_msgs::Marker::POINTS;
+  line_strip.type = visualization_msgs::Marker::LINE_STRIP;
+
+  points.scale.x = 0.2;
+  points.scale.y = 0.2;
+  line_strip.scale.x = 0.1;
+
+  points.color.g = 1.0f;
+  points.color.a = 1.0;
+
+  line_strip.color.b = 1.0f;
+  line_strip.color.a = 1.0;
+
+  double height = 0.1;
+  double dh = 0.3;
+  for (std::vector<Eigen::Vector2d>::iterator itr = goals.begin();
+     itr != goals.end(); itr++) 
+  {
+    geometry_msgs::Point p;
+    p.x = (*itr)(0);
+    p.y = (*itr)(1);
+    std::vector<Eigen::Vector2d>::iterator ind = std::find(waypoints.begin(), waypoints.end(), *itr);
+    int index = ind-waypoints.begin();
+    p.z = height+index*dh;
+    points.points.push_back(p);
+  }
+
+  for (std::vector<Eigen::Vector2d>::iterator itr = waypoints.begin();
+     itr != waypoints.end()-1; itr++) 
+  {
+    geometry_msgs::Point p, p2;
+    p.x = (*itr)(0);
+    p.y = (*itr)(1);
+    p.z = height;
+    height += dh;
+    std::vector<Eigen::Vector2d>::iterator dupe = std::next(itr,1);
+    p2.x = (*dupe)(0);
+    p2.y = (*dupe)(1);
+    p2.z = height;
+    line_strip.points.push_back(p);
+    line_strip.points.push_back(p2);
+    
+  }
+// MARKER STUFF END  
+
 }
 
 
@@ -279,10 +310,18 @@ int main(int argc, char **argv) {
   ros::Rate loop_rate(20); // 20Hz update rate
   ROS_INFO("~~START~~ ^-^");
 
+
   while (ros::ok()) {
     loop_rate.sleep(); // Maintain the loop rate
     ros::spinOnce();   // Check for new messages
-    std::cout<<"\n\n WAYPTS: "<<waypoints.size();  
+
+
+  std::cout<<"\n\n WAYPTS: " << waypoints.size();  
+  for (std::vector<Eigen::Vector2d>::iterator itr = waypoints.begin();
+    itr != waypoints.end(); itr++)
+  {
+    std::cout<<"\n waypoint:"<<(*itr)(0)<<", "<<(*itr)(1);
+  }
 
     //while (!map_is_setup); // Wait until a map is set up
     if (waypoints.empty()){
@@ -314,12 +353,15 @@ int main(int argc, char **argv) {
           done_rotation = true;
           need_to_rotate = false;
         }
-        std::cout<<"\n ROTATING";
-        std::cout<<"\n  angle_to_pt: "<< angle_to_pt*rad2deg
-          <<"\n  angle diff: "<< angle_diff*rad2deg
-          <<"\n  pt-yaw "<< (angle_to_pt - Yaw)*rad2deg
-          <<"\n   +pi " << (angle_to_pt - Yaw + M_PI)*rad2deg
-          <<"\n  fmod:" << std::fmod((angle_to_pt-Yaw+M_PI),(2*M_PI))*rad2deg;
+        if (COMMENT == 1)
+        {
+          std::cout<<"\n ROTATING";
+          std::cout<<"\n  angle_to_pt: "<< angle_to_pt*rad2deg
+            <<"\n  angle diff: "<< angle_diff*rad2deg
+            <<"\n  pt-yaw "<< (angle_to_pt - Yaw)*rad2deg
+            <<"\n   +pi " << (angle_to_pt - Yaw + M_PI)*rad2deg
+            <<"\n  fmod:" << std::fmod((angle_to_pt-Yaw+M_PI),(2*M_PI))*rad2deg;
+        }
         int sign = angle_diff/std::abs(angle_diff);
         vel.angular.z = base_angle_speed*sign + angle_diff*angle_gain;
         vel.linear.x = 0;
@@ -327,7 +369,7 @@ int main(int argc, char **argv) {
       else {
         done_rotation = false;
         ///////////// Move towards point
-        std::cout<<"\n MOVING STRAIGHT";
+        if (COMMENT == 1){std::cout<<"\n MOVING STRAIGHT";}
         vel.angular.z = 0;
         vel.linear.x = base_speed + speed_gain*dist_to_pt;
       }
@@ -338,12 +380,13 @@ int main(int argc, char **argv) {
       waypoints.erase(waypoints.begin());
       currentGoal = *waypoints.begin();
     }
-
-    std::cout << showpoint << fixed;
-    std::cout<<"\nRobot: x:"<<X<<" y:"<<Y<<" angle:"<<Yaw*rad2deg; 
-    std::cout<<"\nTarg:  x:"<<currentGoal(0)<<" y:"<<currentGoal(1)<<" dist: "<<dist_to_pt<<" ang_dif:"<<angle_diff*rad2deg;
-    std::cout<<"\nSpeed: x:"<<vel.linear.x<<" y:"<<vel.linear.y<<" angle:"<<vel.angular.z;
-
+    if (COMMENT == 1)
+    {
+      std::cout << showpoint << fixed;
+      std::cout<<"\nRobot: x:"<<X<<" y:"<<Y<<" angle:"<<Yaw*rad2deg; 
+      std::cout<<"\nTarg:  x:"<<currentGoal(0)<<" y:"<<currentGoal(1)<<" dist: "<<dist_to_pt<<" ang_dif:"<<angle_diff*rad2deg;
+      std::cout<<"\nSpeed: x:"<<vel.linear.x<<" y:"<<vel.linear.y<<" angle:"<<vel.angular.z;
+    }
     velocity_publisher.publish(vel); // Publish the command velocity
 
     // Publish the RVIZ visualization

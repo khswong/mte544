@@ -56,7 +56,7 @@ void bresenham(int x0, int y0, int x1, int y1, std::vector<int> &x,
   }
 }
 
-#define max_dist 20
+#define max_dist 10
 #define l_distribution 10
 #define num_particles 500
 void PrmPlanner::sampleMilestones() {
@@ -214,15 +214,21 @@ void PrmPlanner::setPos(Eigen::Vector2d pos) {
 }
 
 std::vector<Eigen::Vector2d> PrmPlanner::getPath() {
-  std::vector<Eigen::Vector2d> path = Milestones.getPath(CurPos, Goal);
+  std::vector<Eigen::Vector2d> path;
+  std::vector<Eigen::Vector2d> milestone_path = Milestones.getPath(CurPos, Goal);
+  path.resize(milestone_path.size());
+  std::transform(milestone_path.begin(), milestone_path.end(), path.begin(), [this](Eigen::Vector2d a){ return a * this->Resolution;});
   std::stringstream debug_info;
-  debug_info << "Path: ";
-  for (std::vector<Eigen::Vector2d>::iterator itr = path.begin(); itr != path.end(); itr++)
-    {
-      debug_info << " "<< (*itr);
-    }
-  ROS_INFO("%s", debug_info.str().c_str());
-  return Milestones.getPath(CurPos, Goal);
+  if (!path.empty())
+  {
+    debug_info << "Path: ";
+    for (std::vector<Eigen::Vector2d>::iterator itr = path.begin(); itr != path.end(); itr++)
+     {
+        debug_info << " ("<< (*itr).transpose() << "), ";
+      }
+    ROS_INFO("%s", debug_info.str().c_str());
+  }
+  return path;
 }
 
 void PrmPlanner::setRes(float res) { Resolution = res; }
